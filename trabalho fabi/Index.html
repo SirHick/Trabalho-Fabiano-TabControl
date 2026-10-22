@@ -63,6 +63,37 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
 #toast{position:fixed;right:22px;bottom:22px;padding:12px 18px;border-radius:8px;color:#fff;font-weight:500;background:var(--green);transform:translateY(90px);transition:transform .25s;max-width:380px;z-index:9}
 #toast.on{transform:none}#toast.erro{background:var(--red)}
 .linha{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+
+.date-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint,.form-note{font-size:12px;color:var(--mute);line-height:1.45}
+.cad-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 20px}
+.stat-card{background:linear-gradient(135deg,#fff,#F5F8FC);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:3px}
+.stat-card span{font-size:13px;color:var(--mute);font-weight:600}
+.stat-card strong{font:700 30px/1.2 var(--disp);color:var(--navy)}
+.stat-card small{font-size:12px;color:var(--mute)}
+.cad-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
+.cad-form{display:flex;flex-direction:column;gap:15px}
+.cad-form .btn{margin-top:auto}
+.form-heading{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.form-heading h2{margin:0 0 3px}
+.form-heading p,.list-heading p{font-size:13px;color:var(--mute)}
+.form-icon{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:#E1EFFB;color:var(--blue);font:700 18px var(--disp);flex:none}
+.tablet-icon{background:#E0F5EB;color:#137A50}
+.cad-list{margin-top:20px}
+.list-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}
+.list-heading h2{margin-bottom:3px}
+.search-label{width:min(330px,100%);flex:none}
+.tag-code{font:500 12px ui-monospace,SFMono-Regular,Consolas,monospace;background:#EEF3F8;padding:4px 7px;border-radius:5px}.cad-list table tbody tr:hover{background:#F6F9FC}
+.cad-list th{background:#F7F9FC}
+@media(max-width:700px){
+ .cad-stats{grid-template-columns:1fr}
+ .cad-grid{grid-template-columns:1fr}
+ .list-heading{flex-direction:column}
+ .search-label{width:100%}
+ .date-row{grid-template-columns:1fr 1fr}
+}
+
 @media(max-width:860px){
  body{grid-template-columns:1fr}
  aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:14px;gap:12px}
@@ -100,8 +131,15 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
       <h2>Nova reserva</h2>
       <label>Professor<select class="sp" name="tag_professor" required></select></label>
       <label>Tablet<select class="st" name="codigo" required></select></label>
-      <label>Início<input type="datetime-local" name="inicio" required></label>
-      <label>Fim<input type="datetime-local" name="fim" required></label>
+      <div class="date-row">
+        <label>Data de início (DD/MM)<input type="text" name="inicio_data" placeholder="22/10" inputmode="numeric" pattern="\\d{2}/\\d{2}" maxlength="5" required></label>
+        <label>Horário<input type="time" name="inicio_hora" required></label>
+      </div>
+      <div class="date-row">
+        <label>Data de término (DD/MM)<input type="text" name="fim_data" placeholder="22/10" inputmode="numeric" pattern="\\d{2}/\\d{2}" maxlength="5" required></label>
+        <label>Horário<input type="time" name="fim_hora" required></label>
+      </div>
+      <p class="hint">O ano atual será preenchido automaticamente. Para reservas de outro ano, fale com o responsável pelo sistema.</p>
       <button class="btn">Reservar tablet</button>
     </form>
     <div class="card tbl" id="tReservas"></div>
@@ -131,23 +169,32 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
 
 <section class="view" id="cadastros">
   <h1>Cadastros</h1>
-  <p class="sub">Cada professor e cada tablet precisa de uma tag RFID única.</p>
-  <div class="grid2" style="grid-template-columns:1fr 1fr">
-    <form class="card" data-act="professor">
-      <h2>Novo professor</h2>
-      <label>Nome<input name="nome" required></label>
-      <label>Email<input type="email" name="email" required></label>
-      <label>Tag RFID<input name="tag" required></label>
-      <button class="btn">Cadastrar professor</button>
+  <p class="sub">Gerencie professores e tablets em um só lugar. Cada cadastro precisa de uma tag RFID única.</p>
+  <div class="cad-stats" id="cadStats">
+    <div class="stat-card"><span>Professores cadastrados</span><strong id="totalProf">0</strong><small>Usuários autorizados</small></div>
+    <div class="stat-card"><span>Tablets cadastrados</span><strong id="totalTab">0</strong><small>Equipamentos no sistema</small></div>
+    <div class="stat-card"><span>Tablets disponíveis</span><strong id="totalDisp">0</strong><small>Prontos para retirada</small></div>
+  </div>
+  <div class="cad-grid">
+    <form class="card cad-form" data-act="professor">
+      <div class="form-heading"><span class="form-icon">P</span><div><h2>Novo professor</h2><p>Adicione uma pessoa autorizada a retirar tablets.</p></div></div>
+      <label>Nome completo<input name="nome" placeholder="Ex.: Maria da Silva" autocomplete="name" required></label>
+      <label>Email institucional<input type="email" name="email" placeholder="nome@escola.com.br" autocomplete="email" required></label>
+      <label>Tag RFID<input name="tag" placeholder="Aproxime ou digite a tag" required></label>
+      <button class="btn" type="submit">Cadastrar professor</button>
     </form>
-    <form class="card" data-act="tablet">
-      <h2>Novo tablet</h2>
-      <label>Código<input name="codigo" placeholder="TAB-04" required></label>
-      <label>Tag RFID<input name="tag" required></label>
-      <button class="btn">Cadastrar tablet</button>
+    <form class="card cad-form" data-act="tablet">
+      <div class="form-heading"><span class="form-icon tablet-icon">T</span><div><h2>Novo tablet</h2><p>Registre um equipamento no armário.</p></div></div>
+      <label>Código do tablet<input name="codigo" placeholder="Ex.: TAB-04" required></label>
+      <label>Tag RFID<input name="tag" placeholder="Aproxime ou digite a tag" required></label>
+      <div class="form-note">Dica: use um código curto e único para identificar o equipamento rapidamente.</div>
+      <button class="btn" type="submit">Cadastrar tablet</button>
     </form>
   </div>
-  <div class="card tbl" id="tProf" style="margin-top:20px"></div>
+  <div class="card cad-list">
+    <div class="list-heading"><div><h2>Professores cadastrados</h2><p>Consulte os dados registrados no sistema.</p></div><label class="search-label">Buscar professor<input id="buscaProf" type="search" placeholder="Nome, email ou tag RFID…"></label></div>
+    <div class="tbl" id="tProf"></div>
+  </div>
   <div class="linha"><button class="btn sec" onclick="act('exemplo',{})">Carregar dados de exemplo</button></div>
 </section>
 </main>
@@ -177,7 +224,22 @@ async function act(u,d,fechar){
 }
 document.addEventListener('submit',async e=>{
   const f=e.target;if(!f.dataset.act)return;e.preventDefault();
-  if(await act(f.dataset.act,Object.fromEntries(new FormData(f)),'close' in f.dataset))f.reset();
+  const dados=Object.fromEntries(new FormData(f));
+  if(f.dataset.act==='reservar'){
+    const ano=new Date().getFullYear();
+    const montar=(data,hora)=>{
+      const [dia,mes]=data.split('/').map(Number);
+      const d=new Date(ano,mes-1,dia);
+      if(d.getFullYear()!==ano||d.getMonth()!==mes-1||d.getDate()!==dia)throw new Error('Confira a data: use DD/MM.');
+      return `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}T${hora}`;
+    };
+    try{
+      dados.inicio=montar(dados.inicio_data,dados.inicio_hora);
+      dados.fim=montar(dados.fim_data,dados.fim_hora);
+    }catch(err){toast(err.message,false);return;}
+    delete dados.inicio_data;delete dados.inicio_hora;delete dados.fim_data;delete dados.fim_hora;
+  }
+  if(await act(f.dataset.act,dados,'close' in f.dataset))f.reset();
 });
 $$('nav button').forEach(b=>b.onclick=()=>{
   $$('nav button,.view').forEach(x=>x.classList.remove('on'));
@@ -225,9 +287,10 @@ function render(){
     `<div class="obs"><b>${esc(o.codigo)}</b> <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
     :'<p class="vazio">Nenhuma observação registrada.</p>';
 
-  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID'],S.profs.map(p=>
-    `<tr><td>${esc(p.nome)}</td><td>${esc(p.email)}</td><td>${esc(p.tag_rfid)}</td></tr>`),
-    'Nenhum professor cadastrado.');
+  $('#totalProf').textContent=S.profs.length;
+  $('#totalTab').textContent=S.tablets.length;
+  $('#totalDisp').textContent=S.tablets.filter(t=>t.status==='disponivel').length;
+  renderProfessores();
 }
 
 function abrir(codigo){
