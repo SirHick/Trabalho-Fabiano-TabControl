@@ -21,9 +21,9 @@ from email.message import EmailMessage
 # ------------------------------------------------------------------
 DB_ARQUIVO = "tabcontrol.db"
 
-BATERIA_MINIMA = 20          # abaixo disso o emprestimo e bloqueado (%)
+BATERIA_MINIMA = 50          # abaixo disso o emprestimo e bloqueado (%)
 DIAS_MAX_ANTECEDENCIA = 7    # evita "reserva muito antecipada"
-TOLERANCIA_RETIRADA_MIN = 15 # pode retirar ate 15 min antes do horario reservado
+TOLERANCIA_RETIRADA_MIN = 5 # pode retirar ate 5 min antes do horario reservado
 
 # Email: se SMTP_HOST ficar None, os emails so aparecem no console (simulado)
 SMTP_HOST = None             # ex: "smtp.gmail.com"
