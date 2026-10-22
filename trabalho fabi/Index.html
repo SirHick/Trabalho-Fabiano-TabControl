@@ -86,6 +86,18 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
 .search-label{width:min(330px,100%);flex:none}
 .tag-code{font:500 12px ui-monospace,SFMono-Regular,Consolas,monospace;background:#EEF3F8;padding:4px 7px;border-radius:5px}.cad-list table tbody tr:hover{background:#F6F9FC}
 .cad-list th{background:#F7F9FC}
+
+/* ---- Aba Histórico ---- */
+.hist-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.hist-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
+.hist-top h2{margin-bottom:3px}.hist-top p{font-size:13px;color:var(--mute)}
+.filtros{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(125px,1fr)) auto;gap:12px;align-items:end;margin-bottom:16px}
+.filtros .btn{height:40px}
+.hist td small{display:block;color:var(--mute);font-size:12px;line-height:1.35}
+.hist-foot{margin-top:12px}
+.btn.perigo{background:#FBE4E4;color:#A82727}.btn.perigo:hover{background:#F5CFCF}
+.tbl td.acao,.tbl th.acao{text-align:right;width:1%}
+@media(max-width:1100px){.hist-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.filtros{grid-template-columns:repeat(2,minmax(0,1fr))}.filtros .btn{grid-column:1/-1}}
 @media(max-width:700px){
  .cad-stats{grid-template-columns:1fr}
  .cad-grid{grid-template-columns:1fr}
@@ -148,8 +160,24 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
 
 <section class="view" id="historico">
   <h1>Histórico</h1>
-  <p class="sub">Quem retirou, quando devolveu e a bateria na saída e na volta.</p>
-  <div class="card tbl" id="tHist"></div>
+  <p class="sub">Registro completo dos empréstimos: quem retirou, qual equipamento, quando saiu e quando voltou.</p>
+  <div class="cad-stats hist-stats" id="histStats"></div>
+  <div class="card cad-list hist" style="margin-top:0">
+    <div class="hist-top">
+      <div><h2>Empréstimos registrados</h2><p>Os mais recentes aparecem primeiro. Os filtros valem também para a exportação.</p></div>
+      <button class="btn sec" id="btnExportar" type="button">Exportar CSV</button>
+    </div>
+    <div class="filtros">
+      <label>Buscar<input id="fBusca" type="search" placeholder="Professor, e-mail, tablet ou tag…"></label>
+      <label>Situação<select id="fStatus"><option value="">Todas</option><option value="uso">Em uso</option><option value="devolvido">Devolvidos</option></select></label>
+      <label>Tablet<select id="fTablet"></select></label>
+      <label>Retirada de<input type="date" id="fDe"></label>
+      <label>Retirada até<input type="date" id="fAte"></label>
+      <button class="btn sec" id="fLimpar" type="button">Limpar</button>
+    </div>
+    <div class="tbl" id="tHist"></div>
+    <p class="hint hist-foot" id="histRodape"></p>
+  </div>
 </section>
 
 <section class="view" id="obs">
@@ -159,8 +187,10 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
     <form class="card" data-act="observacao">
       <h2>Nova observação</h2>
       <label>Tablet<select class="st" name="codigo" required></select></label>
+      <label>Tipo<select name="tipo"><option value="defeito">Defeito (bloqueia o tablet)</option><option value="observacao">Observação geral</option></select></label>
       <label>Professor<select class="sp" data-opt="1" name="tag_professor"></select></label>
       <label>O que aconteceu<textarea name="texto" required></textarea></label>
+      <p class="hint">Um defeito bloqueia retiradas e novas reservas e coloca o tablet em manutenção. Para liberar depois, abra o tablet no Armário e salve a leitura com o hardware "Funcionando".</p>
       <button class="btn">Registrar observação</button>
     </form>
     <div class="card" id="lObs"></div>
@@ -195,6 +225,10 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
     <div class="list-heading"><div><h2>Professores cadastrados</h2><p>Consulte os dados registrados no sistema.</p></div><label class="search-label">Buscar professor<input id="buscaProf" type="search" placeholder="Nome, email ou tag RFID…"></label></div>
     <div class="tbl" id="tProf"></div>
   </div>
+  <div class="card cad-list">
+    <div class="list-heading"><div><h2>Tablets cadastrados</h2><p>Equipamentos do armário e a situação de cada um.</p></div></div>
+    <div class="tbl" id="tTabs"></div>
+  </div>
   <div class="linha"><button class="btn sec" onclick="act('exemplo',{})">Carregar dados de exemplo</button></div>
 </section>
 </main>
@@ -206,13 +240,15 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11):'—';
-const bat=b=>b<20?'var(--red)':b<50?'var(--amber)':'var(--green)';
+let BAT_MIN=50; // o valor real vem do servidor (/api/config)
+const bat=b=>b<BAT_MIN?'var(--red)':b<BAT_MIN+20?'var(--amber)':'var(--green)';
 const ST={disponivel:['Livre','var(--green)'],emprestado:['Emprestado','var(--blue)'],manutencao:['Manutenção','var(--red)']};
 let S={tablets:[],profs:[],reservas:[],hist:[],obs:[]};
 
 const api=async(u,b)=>(await fetch('/api/'+u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:undefined)).json();
 
 async function load(){
+  BAT_MIN=(await api('config')).bateria_minima;
   [S.tablets,S.profs,S.reservas,S.hist,S.obs]=await Promise.all(['tablets','professores','reservas','historico','observacoes'].map(u=>api(u)));
   render();
 }
@@ -243,7 +279,7 @@ document.addEventListener('submit',async e=>{
 });
 $$('nav button').forEach(b=>b.onclick=()=>{
   $$('nav button,.view').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');
+  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');if(b.dataset.v==='historico')load();
 });
 
 const tabela=(cols,linhas,vazio)=>linhas.length
@@ -253,7 +289,7 @@ const chip=(t,c)=>`<span class="chip" style="--c:${c}">${t}</span>`;
 
 function slot(t){
   const [l,c]=ST[t.status];
-  const nota=t.status=='emprestado'?'Com '+esc(t.com):t.hardware!='ok'?'Hardware com defeito':t.bateria<20?'Bateria baixa, bloqueado':'Pronto para retirada';
+  const nota=t.status=='emprestado'?'Com '+esc(t.com)+(t.hardware!='ok'?' (com defeito)':''):t.hardware!='ok'?'Hardware com defeito':t.bateria<BAT_MIN?'Bateria baixa, bloqueado':'Pronto para retirada';
   return `<button class="slot" style="--c:${c}" onclick="abrir('${esc(t.codigo)}')">
     <div class="top"><b>${esc(t.codigo)}</b>${chip(l,c)}</div>
     <div class="tab"><i style="height:${t.bateria}%;background:${bat(t.bateria)}"></i><span>${t.bateria}%</span></div>
@@ -265,8 +301,8 @@ function renderProfessores(){
   if(!campo)return;
   const busca=campo.value.trim().toLocaleLowerCase('pt-BR');
   const lista=S.profs.filter(p=>[p.nome,p.email,p.tag_rfid].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(busca)));
-  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID'],lista.map(p=>
-    `<tr><td><b>${esc(p.nome)}</b></td><td>${esc(p.email)}</td><td><span class="tag-code">${esc(p.tag_rfid)}</span></td></tr>`),
+  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID',''],lista.map(p=>
+    `<tr><td><b>${esc(p.nome)}</b></td><td>${esc(p.email)}</td><td><span class="tag-code">${esc(p.tag_rfid)}</span></td><td class="acao"><button class="btn perigo sm" onclick="excluir('professor',${p.id})">Excluir</button></td></tr>`),
     busca?'Nenhum professor corresponde à busca.':'Nenhum professor cadastrado. Cadastre o primeiro usando o formulário acima.');
 }
 $('#buscaProf')?.addEventListener('input',renderProfessores);
@@ -275,7 +311,7 @@ function render(){
   const n=s=>S.tablets.filter(t=>t.status==s).length;
   $('#resumo').innerHTML=[['disponivel','Livres'],['emprestado','Emprestados'],['manutencao','Em manutenção']]
     .map(([s,l])=>`<span><i class="dot" style="--c:${ST[s][1]}"></i><b>${n(s)}</b> ${l}</span>`).join('')
-    +`<span><i class="dot" style="--c:var(--amber)"></i><b>${S.tablets.filter(t=>t.bateria<20).length}</b> Bateria baixa</span>`;
+    +`<span><i class="dot" style="--c:var(--amber)"></i><b>${S.tablets.filter(t=>t.bateria<BAT_MIN).length}</b> Bateria baixa</span>`;
   $('#cabinet').innerHTML=S.tablets.length?S.tablets.map(slot).join('')
     :'<p class="vazio" style="grid-column:1/-1">Nenhum tablet cadastrado. Vá em Cadastros para adicionar o primeiro.</p>';
 
@@ -288,21 +324,121 @@ function render(){
     <td>${r.status=='ativa'?`<button class="btn sec sm" onclick="act('cancelar',{id:${r.id},tag_professor:'${esc(r.tag_professor)}'})">Cancelar</button>`:''}</td></tr>`),
     'Nenhuma reserva ainda. Use o formulário ao lado para criar a primeira.');
 
-  $('#tHist').innerHTML=tabela(['Professor','Tablet','Retirada','Devolução','Bateria (saída / volta)'],S.hist.map(h=>
-    `<tr><td>${esc(h.nome)}</td><td>${esc(h.codigo)}</td><td>${fmt(h.retirada)}</td>
-    <td>${h.devolucao?fmt(h.devolucao):chip('Em uso','var(--blue)')}</td>
-    <td>${h.bateria_retirada}% / ${h.bateria_devolucao==null?'—':h.bateria_devolucao+'%'}</td></tr>`),
-    'Ainda não há retiradas. Elas aparecem aqui assim que um tablet for retirado.');
+  renderHistorico();
 
   $('#lObs').innerHTML=S.obs.length?'<h2>Registros</h2>'+S.obs.map(o=>
-    `<div class="obs"><b>${esc(o.codigo)}</b> <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
+    `<div class="obs"><b>${esc(o.codigo)}</b> ${tipoObs(o)} <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
     :'<p class="vazio">Nenhuma observação registrada.</p>';
 
   $('#totalProf').textContent=S.profs.length;
   $('#totalTab').textContent=S.tablets.length;
   $('#totalDisp').textContent=S.tablets.filter(t=>t.status==='disponivel').length;
   renderProfessores();
+  renderTabletsCad();
 }
+
+const tipoObs=o=>o.tipo==='defeito'?(o.resolvido?chip('Defeito resolvido','var(--green)'):chip('Defeito','var(--red)')):'';
+
+/* ---------- Exclusão de cadastros ---------- */
+function renderTabletsCad(){
+  $('#tTabs').innerHTML=tabela(['Tablet','Tag RFID','Bateria','Situação',''],S.tablets.map(t=>{
+    const [l,c]=ST[t.status];
+    return `<tr><td><b>${esc(t.codigo)}</b></td><td><span class="tag-code">${esc(t.tag_rfid)}</span></td><td>${t.bateria}%</td><td>${chip(l,c)}</td>
+    <td class="acao"><button class="btn perigo sm" onclick="excluir('tablet',${t.id})">Excluir</button></td></tr>`;
+  }),'Nenhum tablet cadastrado. Cadastre o primeiro usando o formulário acima.');
+}
+async function excluir(tipo,id){
+  const item=tipo==='professor'?S.profs.find(p=>p.id===id):S.tablets.find(t=>t.id===id);
+  if(!item)return;
+  const nome=tipo==='professor'?item.nome:item.codigo;
+  if(!confirm(`Excluir ${tipo==='professor'?'o professor':'o tablet'} "${nome}"?`))return;
+  let r=await api('excluir_'+tipo,{id});
+  if(r.confirmar){
+    if(!confirm(r.msg+'\n\nEssa ação não pode ser desfeita. Excluir mesmo assim?'))return;
+    r=await api('excluir_'+tipo,{id,forcar:true});
+  }
+  toast(r.msg,r.ok);
+  if(r.ok)await load();
+}
+
+/* ---------- Histórico ---------- */
+const fmtCompleto=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4)+' '+s.slice(11,16):'—';
+const paraData=s=>new Date(s.replace(' ','T'));
+const minutosDe=h=>Math.max(0,Math.round(((h.devolucao?paraData(h.devolucao):new Date())-paraData(h.retirada))/60000));
+function duracao(m){
+  if(m<1)return '< 1 min';
+  const d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mi=m%60;
+  if(d)return d+' d'+(hh?' '+hh+' h':'');
+  if(hh)return hh+' h'+(mi?' '+mi+' min':'');
+  return mi+' min';
+}
+function filtrarHistorico(){
+  const q=$('#fBusca').value.trim().toLocaleLowerCase('pt-BR'),st=$('#fStatus').value,
+        tb=$('#fTablet').value,de=$('#fDe').value,ate=$('#fAte').value;
+  return S.hist.filter(h=>{
+    if(q&&![h.nome,h.email,h.codigo,h.tag_professor,h.tag_tablet].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(q)))return false;
+    if(st==='uso'&&h.devolucao)return false;
+    if(st==='devolvido'&&!h.devolucao)return false;
+    if(tb&&h.codigo!==tb)return false;
+    const dia=h.retirada.slice(0,10);
+    if(de&&dia<de)return false;
+    if(ate&&dia>ate)return false;
+    return true;
+  });
+}
+function bateriaHist(h){
+  const a=h.bateria_retirada,b=h.bateria_devolucao;
+  if(a==null&&b==null)return '—';
+  const texto=(a==null?'—':a+'%')+' → '+(b==null?'—':b+'%');
+  if(a==null||b==null)return texto;
+  const d=a-b;
+  const nota=d>0?'consumiu '+d+'%':d<0?'carregou '+(-d)+'%':'sem variação';
+  return texto+'<small>'+nota+'</small>';
+}
+function renderHistorico(){
+  const sel=$('#fTablet'),atual=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+S.tablets.map(t=>`<option value="${esc(t.codigo)}">${esc(t.codigo)}</option>`).join('');
+  sel.value=atual;
+
+  const lista=filtrarHistorico();
+  const devolvidos=lista.filter(h=>h.devolucao);
+  const media=devolvidos.length?Math.round(devolvidos.reduce((s,h)=>s+minutosDe(h),0)/devolvidos.length):null;
+  $('#histStats').innerHTML=[
+    ['Empréstimos',lista.length,'Dentro dos filtros atuais'],
+    ['Em uso agora',lista.length-devolvidos.length,'Ainda não devolvidos'],
+    ['Devolvidos',devolvidos.length,'Ciclo concluído'],
+    ['Tempo médio de uso',media==null?'—':duracao(media),'Considera só os devolvidos']
+  ].map(([t,v,s])=>`<div class="stat-card"><span>${t}</span><strong>${v}</strong><small>${s}</small></div>`).join('');
+
+  const filtrando=$('#fBusca').value||$('#fStatus').value||$('#fTablet').value||$('#fDe').value||$('#fAte').value;
+  $('#tHist').innerHTML=tabela(['Professor','Equipamento','Retirada','Devolução','Duração','Bateria (saída → volta)'],lista.map(h=>{
+    const aberto=!h.devolucao;
+    return `<tr><td><b>${esc(h.nome)}</b><small>${esc(h.email)}</small></td>
+    <td><b>${esc(h.codigo)}</b><small>Tag ${esc(h.tag_tablet)}</small></td>
+    <td>${fmtCompleto(h.retirada)}</td>
+    <td>${aberto?chip('Em uso','var(--blue)'):fmtCompleto(h.devolucao)}</td>
+    <td>${duracao(minutosDe(h))}${aberto?'<small>em andamento</small>':''}</td>
+    <td>${bateriaHist(h)}</td></tr>`;
+  }),filtrando?'Nenhum empréstimo corresponde aos filtros.':'Ainda não há retiradas. Elas aparecem aqui assim que um tablet for retirado.');
+  $('#histRodape').textContent=S.hist.length?`Mostrando ${lista.length} de ${S.hist.length} registro${S.hist.length==1?'':'s'}.`:'';
+}
+function exportarHistorico(){
+  const lista=filtrarHistorico();
+  if(!lista.length){toast('Não há registros para exportar.',false);return}
+  const cel=v=>{let s=String(v??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+  const cab=['Professor','E-mail','Tablet','Tag do tablet','Retirada','Devolução','Duração','Bateria na retirada (%)','Bateria na devolução (%)','Situação'];
+  const linhas=lista.map(h=>[h.nome,h.email,h.codigo,h.tag_tablet,fmtCompleto(h.retirada),h.devolucao?fmtCompleto(h.devolucao):'',
+    duracao(minutosDe(h)),h.bateria_retirada??'',h.bateria_devolucao??'',h.devolucao?'Devolvido':'Em uso'].map(cel).join(';'));
+  const csv='\ufeff'+[cab.map(cel).join(';'),...linhas].join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='historico-tabcontrol-'+new Date().toLocaleDateString('sv-SE')+'.csv';
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Exportado: '+lista.length+' registro'+(lista.length==1?'':'s')+'.',true);
+}
+['#fBusca','#fStatus','#fTablet','#fDe','#fAte'].forEach(s=>$(s).addEventListener('input',renderHistorico));
+$('#fLimpar').onclick=()=>{['#fBusca','#fStatus','#fTablet','#fDe','#fAte'].forEach(s=>$(s).value='');renderHistorico()};
+$('#btnExportar').onclick=exportarHistorico;
 
 function abrir(codigo){
   const t=S.tablets.find(x=>x.codigo==codigo);
@@ -317,13 +453,13 @@ function abrir(codigo){
     corpo=`<p style="margin:10px 0">Com <b>${esc(t.com)}</b>. Informe a leitura atual ao devolver.</p>
     <form data-act="devolver" data-close><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
     <label>Bateria (%)<input name="bateria" type="number" min="0" max="100" value="${t.bateria}" required></label>
-    <label>Hardware<select name="hardware"><option value="ok">Funcionando</option><option value="defeito">Com defeito</option></select></label>
+    <label>Hardware<select name="hardware"><option value="ok">Funcionando</option><option value="defeito"${t.hardware!='ok'?' selected':''}>Com defeito</option></select></label>
     <button class="btn">Registrar devolução</button></form>`;
   }else if(t.status=='manutencao'){
     corpo=`<p class="aviso" style="margin:12px 0">Em manutenção, não pode ser retirado. Marque o hardware como funcionando para liberar.</p>`+leitura;
   }else{
-    corpo=(t.bateria<20?`<p class="aviso" style="margin:12px 0">Bateria em ${t.bateria}%. A retirada fica bloqueada abaixo de 20%.</p>`:'')+
-    (S.profs.length?`<form data-act="retirar" data-close style="margin-top:14px"><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
+    corpo=(t.bateria<BAT_MIN?`<p class="aviso" style="margin:12px 0">Bateria em ${t.bateria}%. A retirada fica bloqueada abaixo de ${BAT_MIN}%. Recarregue o tablet e atualize a leitura para liberar.</p>`:'')+
+    (t.bateria<BAT_MIN?'':S.profs.length?`<form data-act="retirar" data-close style="margin-top:14px"><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
       <label>Quem está retirando<select name="tag_professor">${S.profs.map(p=>`<option value="${esc(p.tag_rfid)}">${esc(p.nome)}</option>`).join('')}</select></label>
       <button class="btn">Retirar tablet</button></form>`:'<p class="vazio">Cadastre um professor antes de retirar.</p>')+leitura;
   }

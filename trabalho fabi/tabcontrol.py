@@ -21,7 +21,7 @@ from email.message import EmailMessage
 # ------------------------------------------------------------------
 DB_ARQUIVO = "tabcontrol.db"
 
-BATERIA_MINIMA = 50          # abaixo disso o emprestimo e bloqueado (%)
+BATERIA_MINIMA = 50          # abaixo disso (49% ou menos) bloqueia a retirada; 50% ainda libera (%)
 DIAS_MAX_ANTECEDENCIA = 7    # evita "reserva muito antecipada"
 TOLERANCIA_RETIRADA_MIN = 5 # pode retirar ate 5 min antes do horario reservado
 
@@ -97,9 +97,17 @@ def criar_tabelas():
             tablet_id     INTEGER NOT NULL REFERENCES tablets(id),
             professor_id  INTEGER REFERENCES professores(id),
             data          TEXT NOT NULL,
-            texto         TEXT NOT NULL
+            texto         TEXT NOT NULL,
+            tipo          TEXT NOT NULL DEFAULT 'observacao',  -- observacao / defeito
+            resolvido     INTEGER NOT NULL DEFAULT 0
         );
         """)
+        # bancos criados antes dessa versao: acrescenta as colunas novas
+        colunas = [c["name"] for c in con.execute("PRAGMA table_info(observacoes)")]
+        if "tipo" not in colunas:
+            con.execute("ALTER TABLE observacoes ADD COLUMN tipo TEXT NOT NULL DEFAULT 'observacao'")
+        if "resolvido" not in colunas:
+            con.execute("ALTER TABLE observacoes ADD COLUMN resolvido INTEGER NOT NULL DEFAULT 0")
 
 
 # ------------------------------------------------------------------
@@ -185,7 +193,71 @@ def atualizar_status_tablet(codigo, bateria, hardware):
             novo_status = "disponivel"
         con.execute("UPDATE tablets SET bateria = ?, hardware = ?, status = ? WHERE id = ?",
                     (bateria, hardware, novo_status, tablet["id"]))
+        if hardware == "ok" and tablet["hardware"] != "ok":
+            # tablet consertado: os defeitos em aberto passam a "resolvidos"
+            con.execute("""UPDATE observacoes SET resolvido = 1
+                           WHERE tablet_id = ? AND tipo = 'defeito' AND resolvido = 0""", (tablet["id"],))
     return True, f"{codigo}: bateria {bateria}%, hardware {hardware}, status {novo_status}."
+
+
+# ------------------------------------------------------------------
+# Exclusao de cadastros
+# ------------------------------------------------------------------
+def _plural(n, singular, plural):
+    return f"{n} {singular if n == 1 else plural}"
+
+
+def excluir_professor(prof_id, forcar=False):
+    """Retorna (ok, msg) ou (False, msg, True) quando precisa de confirmacao."""
+    with conectar() as con:
+        prof = con.execute("SELECT * FROM professores WHERE id = ?", (prof_id,)).fetchone()
+        if not prof:
+            return False, "Professor nao encontrado."
+        if con.execute("SELECT 1 FROM emprestimos WHERE professor_id = ? AND devolucao IS NULL",
+                       (prof_id,)).fetchone():
+            return False, (f"{prof['nome']} esta com um tablet emprestado. "
+                           "Registre a devolucao antes de excluir.")
+
+        n_emp = con.execute("SELECT COUNT(*) FROM emprestimos WHERE professor_id = ?", (prof_id,)).fetchone()[0]
+        n_res = con.execute("SELECT COUNT(*) FROM reservas WHERE professor_id = ?", (prof_id,)).fetchone()[0]
+        n_obs = con.execute("SELECT COUNT(*) FROM observacoes WHERE professor_id = ?", (prof_id,)).fetchone()[0]
+
+        if (n_emp or n_res) and not forcar:
+            return False, (f"{prof['nome']} tem {_plural(n_emp, 'emprestimo', 'emprestimos')} no historico e "
+                           f"{_plural(n_res, 'reserva', 'reservas')}. Excluir o professor tambem apaga esses registros."), True
+
+        con.execute("DELETE FROM emprestimos WHERE professor_id = ?", (prof_id,))
+        con.execute("DELETE FROM reservas WHERE professor_id = ?", (prof_id,))
+        con.execute("UPDATE observacoes SET professor_id = NULL WHERE professor_id = ?", (prof_id,))  # fica anonima
+        con.execute("DELETE FROM professores WHERE id = ?", (prof_id,))
+    return True, f"Professor {prof['nome']} excluido."
+
+
+def excluir_tablet(tablet_id, forcar=False):
+    """Retorna (ok, msg) ou (False, msg, True) quando precisa de confirmacao."""
+    with conectar() as con:
+        tablet = con.execute("SELECT * FROM tablets WHERE id = ?", (tablet_id,)).fetchone()
+        if not tablet:
+            return False, "Tablet nao encontrado."
+        if tablet["status"] == "emprestado" or con.execute(
+                "SELECT 1 FROM emprestimos WHERE tablet_id = ? AND devolucao IS NULL", (tablet_id,)).fetchone():
+            return False, (f"O tablet {tablet['codigo']} esta emprestado. "
+                           "Registre a devolucao antes de excluir.")
+
+        n_emp = con.execute("SELECT COUNT(*) FROM emprestimos WHERE tablet_id = ?", (tablet_id,)).fetchone()[0]
+        n_res = con.execute("SELECT COUNT(*) FROM reservas WHERE tablet_id = ?", (tablet_id,)).fetchone()[0]
+        n_obs = con.execute("SELECT COUNT(*) FROM observacoes WHERE tablet_id = ?", (tablet_id,)).fetchone()[0]
+
+        if (n_emp or n_res or n_obs) and not forcar:
+            return False, (f"O tablet {tablet['codigo']} tem {_plural(n_emp, 'emprestimo', 'emprestimos')} no historico, "
+                           f"{_plural(n_res, 'reserva', 'reservas')} e "
+                           f"{_plural(n_obs, 'observacao', 'observacoes')}. Excluir o tablet tambem apaga esses registros."), True
+
+        con.execute("DELETE FROM emprestimos WHERE tablet_id = ?", (tablet_id,))
+        con.execute("DELETE FROM reservas WHERE tablet_id = ?", (tablet_id,))
+        con.execute("DELETE FROM observacoes WHERE tablet_id = ?", (tablet_id,))
+        con.execute("DELETE FROM tablets WHERE id = ?", (tablet_id,))
+    return True, f"Tablet {tablet['codigo']} excluido."
 
 
 # ------------------------------------------------------------------
@@ -208,8 +280,8 @@ def reservar(tag_professor, codigo_tablet, inicio, fim):
             return False, "Professor nao encontrado."
         if not tablet:
             return False, "Tablet nao encontrado."
-        if tablet["status"] == "manutencao":
-            return False, "Esse tablet esta em manutencao."
+        if tablet["status"] == "manutencao" or tablet["hardware"] != "ok":
+            return False, "Esse tablet esta em manutencao (defeito registrado)."
 
         conflito = con.execute(
             """SELECT 1 FROM reservas
@@ -301,6 +373,8 @@ def devolver(tag_tablet, bateria_atual, hardware="ok"):
         if not emp:
             return False, "Nao tem emprestimo em aberto pra esse tablet."
 
+        if tablet["hardware"] != "ok":
+            hardware = "defeito"  # defeito registrado durante o emprestimo continua valendo
         novo_status = "disponivel" if hardware == "ok" else "manutencao"
         con.execute("UPDATE emprestimos SET devolucao = ?, bateria_devolucao = ? WHERE id = ?",
                     (agora(), bateria_atual, emp["id"]))
@@ -320,15 +394,34 @@ def devolver(tag_tablet, bateria_atual, hardware="ok"):
 # ------------------------------------------------------------------
 # Observacoes / reclamacoes
 # ------------------------------------------------------------------
-def registrar_observacao(codigo_tablet, tag_professor, texto):
+def registrar_observacao(codigo_tablet, tag_professor, texto, defeito=False):
+    """Se 'defeito' for True, o tablet fica bloqueado (retirada e reserva) e vai pra manutencao."""
+    texto = texto.strip()
+    if not texto:
+        return False, "Descreva o que aconteceu."
     with conectar() as con:
-        tablet = con.execute("SELECT id FROM tablets WHERE codigo = ?", (codigo_tablet,)).fetchone()
+        tablet = con.execute("SELECT * FROM tablets WHERE codigo = ?", (codigo_tablet,)).fetchone()
         if not tablet:
             return False, "Tablet nao encontrado."
         prof = con.execute("SELECT id FROM professores WHERE tag_rfid = ?", (tag_professor,)).fetchone()
-        con.execute("INSERT INTO observacoes (tablet_id, professor_id, data, texto) VALUES (?, ?, ?, ?)",
-                    (tablet["id"], prof["id"] if prof else None, agora(), texto))
-    return True, "Observacao registrada."
+        con.execute("""INSERT INTO observacoes (tablet_id, professor_id, data, texto, tipo)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (tablet["id"], prof["id"] if prof else None, agora(), texto,
+                     "defeito" if defeito else "observacao"))
+        if defeito:
+            # emprestado continua emprestado; vai pra manutencao quando for devolvido
+            novo_status = "manutencao" if tablet["status"] == "disponivel" else tablet["status"]
+            con.execute("UPDATE tablets SET hardware = 'defeito', status = ? WHERE id = ?",
+                        (novo_status, tablet["id"]))
+
+    if not defeito:
+        return True, "Observacao registrada."
+
+    enviar_email(EMAIL_ADMIN, f"Defeito registrado: tablet {codigo_tablet}", texto)
+    if tablet["status"] == "emprestado":
+        return True, (f"Defeito registrado. O {codigo_tablet} esta emprestado e vai para "
+                      "manutencao assim que for devolvido.")
+    return True, f"Defeito registrado. O {codigo_tablet} foi bloqueado e enviado para manutencao."
 
 
 # ------------------------------------------------------------------
@@ -514,7 +607,8 @@ def menu():
             codigo = input("Codigo do tablet: ").strip()
             tag_p = ler_tag("Tag do professor (Enter pra deixar anonimo): ")
             texto = input("Observacao: ").strip()
-            resposta(registrar_observacao(codigo, tag_p, texto))
+            defeito = input("E um defeito que impede o uso? (s/n): ").strip().lower() == "s"
+            resposta(registrar_observacao(codigo, tag_p, texto, defeito))
 
         elif op == "12":
             mostrar_observacoes()
