@@ -260,6 +260,17 @@ function slot(t){
     <small>${nota}</small></button>`;
 }
 
+function renderProfessores(){
+  const campo=$('#buscaProf');
+  if(!campo)return;
+  const busca=campo.value.trim().toLocaleLowerCase('pt-BR');
+  const lista=S.profs.filter(p=>[p.nome,p.email,p.tag_rfid].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(busca)));
+  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID'],lista.map(p=>
+    `<tr><td><b>${esc(p.nome)}</b></td><td>${esc(p.email)}</td><td><span class="tag-code">${esc(p.tag_rfid)}</span></td></tr>`),
+    busca?'Nenhum professor corresponde à busca.':'Nenhum professor cadastrado. Cadastre o primeiro usando o formulário acima.');
+}
+$('#buscaProf')?.addEventListener('input',renderProfessores);
+
 function render(){
   const n=s=>S.tablets.filter(t=>t.status==s).length;
   $('#resumo').innerHTML=[['disponivel','Livres'],['emprestado','Emprestados'],['manutencao','Em manutenção']]
