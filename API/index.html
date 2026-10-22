@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TabControl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EDF1F5;--card:#fff;--ink:#14233A;--mute:#5B6B80;--line:#D5DDE7;--blue:#0A5CA8;--navy:#0B2F55;--green:#1E9E6A;--amber:#D99A00;--red:#CF3F3F;--font:'Figtree',system-ui,sans-serif;--disp:'Bricolage Grotesque','Figtree',system-ui,sans-serif}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 var(--font);color:var(--ink);background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+aside{background:var(--navy);color:#fff;padding:26px 14px;display:flex;flex-direction:column;gap:30px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px}
+.brand b{font:700 21px var(--disp);display:block;line-height:1.1}
+.brand small{font-size:12px;opacity:.7}
+.logo{flex:none;width:24px;height:34px;border:2.5px solid #fff;border-radius:7px;position:relative}
+.logo::after{content:"";position:absolute;left:50%;bottom:3px;width:6px;height:2px;background:#fff;transform:translateX(-50%)}
+nav{display:flex;flex-direction:column;gap:3px}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:7px;color:#C9D8EA;font-weight:500}
+nav button:hover{background:rgba(255,255,255,.08)}
+nav button.on{background:#fff;color:var(--navy);font-weight:600}
+main{padding:34px 40px 60px;max-width:1180px;width:100%}
+h1{font:700 30px/1.15 var(--disp);letter-spacing:-.01em}
+.sub{color:var(--mute);margin:4px 0 24px}
+h2{font:600 17px var(--disp);margin-bottom:12px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+.grid2{display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:20px;align-items:start}
+.resumo{display:flex;flex-wrap:wrap;gap:22px;margin-bottom:18px;color:var(--mute)}
+.resumo span{display:flex;align-items:center;gap:8px}
+.resumo b{color:var(--ink);font-size:18px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.cabinet{background:#C9D3DF;border:1px solid #B5C1D0;border-radius:14px;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.slot{all:unset;box-sizing:border-box;cursor:pointer;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;border-bottom:4px solid var(--c)}
+.slot:hover{outline:2px solid var(--blue)}
+.slot .top{display:flex;justify-content:space-between;align-items:center;width:100%}
+.slot small{color:var(--mute);font-size:12.5px;text-align:center;min-height:19px}
+.chip{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:color-mix(in srgb,var(--c) 14%,#fff);color:color-mix(in srgb,var(--c) 75%,#000)}
+.tab{position:relative;width:74px;height:100px;border:3px solid var(--ink);border-radius:11px;overflow:hidden;background:#E8EEF4}
+.tab i{position:absolute;left:0;right:0;bottom:0;opacity:.88}
+.tab span{position:absolute;inset:0;display:grid;place-items:center;font:700 19px var(--disp)}
+form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--mute)}
+input,select,textarea{font:inherit;color:var(--ink);padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:#fff;width:100%}
+textarea{min-height:84px;resize:vertical}
+:is(input,select,textarea,button,a):focus-visible{outline:3px solid #7DB4E8;outline-offset:1px}
+.btn{font:600 15px var(--font);border:0;border-radius:6px;padding:10px 16px;cursor:pointer;background:var(--blue);color:#fff}
+.btn:hover{background:#084a89}
+.btn.sec{background:#E4EBF3;color:var(--ink)}.btn.sec:hover{background:#D5DFEB}
+.btn.sm{padding:5px 10px;font-size:13px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:13px;color:var(--mute);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid #E8EDF3;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.vazio{color:var(--mute);padding:22px 12px;white-space:normal}
+.obs{padding:12px 0;border-bottom:1px solid #E8EDF3}.obs:last-child{border:0}
+.obs small{color:var(--mute)}
+.aviso{background:#FDF3D6;border-radius:6px;padding:9px 12px;font-size:14px}
+dialog{border:0;border-radius:14px;padding:26px;width:min(400px,92vw);color:var(--ink)}
+dialog::backdrop{background:rgba(11,47,85,.45)}
+#toast{position:fixed;right:22px;bottom:22px;padding:12px 18px;border-radius:8px;color:#fff;font-weight:500;background:var(--green);transform:translateY(90px);transition:transform .25s;max-width:380px;z-index:9}
+#toast.on{transform:none}#toast.erro{background:var(--red)}
+.linha{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+@media(max-width:860px){
+ body{grid-template-columns:1fr}
+ aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:14px;gap:12px}
+ nav{flex-direction:row;flex-wrap:wrap}
+ main{padding:24px 16px 50px}.grid2{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><div class="logo"></div><div><b>TabControl</b><small>Centro WEG</small></div></div>
+  <nav>
+    <button data-v="painel" class="on">Armário</button>
+    <button data-v="reservas">Reservas</button>
+    <button data-v="historico">Histórico</button>
+    <button data-v="obs">Observações</button>
+    <button data-v="leituras">Leituras</button>
+    <button data-v="cadastros">Cadastros</button>
+  </nav>
+  <button class="btn sec sm" style="margin-top:auto" onclick="sair()">Sair</button>
+</aside>
+
+<main>
+<section class="view on" id="painel">
+  <h1>Armário de tablets</h1>
+  <p class="sub">Clique em um tablet para retirar, devolver ou atualizar a leitura.</p>
+  <div class="resumo" id="resumo"></div>
+  <div class="cabinet" id="cabinet"></div>
+</section>
+
+<section class="view" id="reservas">
+  <h1>Reservas</h1>
+  <p class="sub">Reserve com até 7 dias de antecedência. Horários não podem se sobrepor.</p>
+  <div class="grid2">
+    <form class="card" data-act="reservar">
+      <h2>Nova reserva</h2>
+      <label>Professor<select class="sp" name="tag_professor" required></select></label>
+      <label>Tablet<select class="st" name="codigo" required></select></label>
+      <label>Início<input type="datetime-local" name="inicio" required></label>
+      <label>Fim<input type="datetime-local" name="fim" required></label>
+      <button class="btn">Reservar tablet</button>
+    </form>
+    <div class="card tbl" id="tReservas"></div>
+  </div>
+</section>
+
+<section class="view" id="historico">
+  <h1>Histórico</h1>
+  <p class="sub">Quem retirou, quando devolveu e a bateria na saída e na volta.</p>
+  <div class="card tbl" id="tHist"></div>
+</section>
+
+<section class="view" id="obs">
+  <h1>Observações</h1>
+  <p class="sub">Registre problemas e reclamações sobre um tablet.</p>
+  <div class="grid2">
+    <form class="card" data-act="observacao">
+      <h2>Nova observação</h2>
+      <label>Tablet<select class="st" name="codigo" required></select></label>
+      <label>Professor<select class="sp" data-opt="1" name="tag_professor"></select></label>
+      <label>O que aconteceu<textarea name="texto" required></textarea></label>
+      <button class="btn">Registrar observação</button>
+    </form>
+    <div class="card" id="lObs"></div>
+  </div>
+</section>
+
+<section class="view" id="leituras">
+  <h1>Leituras do armário</h1>
+  <p class="sub">Tudo que o leitor RFID enviou. Esta tela atualiza sozinha.</p>
+  <div class="resumo" id="tDisp"></div>
+  <div class="card tbl" id="tEventos"></div>
+</section>
+
+<section class="view" id="cadastros">
+  <h1>Cadastros</h1>
+  <p class="sub">Cada professor e cada tablet precisa de uma tag RFID única. Para preencher a tag sem digitar, passe a tag no leitor do armário e clique em "Ler do armário".</p>
+  <div class="grid2" style="grid-template-columns:1fr 1fr">
+    <form class="card" data-act="professor">
+      <h2>Novo professor</h2>
+      <label>Nome<input name="nome" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Tag RFID<div style="display:flex;gap:8px"><input name="tag" required><button type="button" class="btn sec sm" onclick="lerTag(this)">Ler do armário</button></div></label>
+      <button class="btn">Cadastrar professor</button>
+    </form>
+    <form class="card" data-act="tablet">
+      <h2>Novo tablet</h2>
+      <label>Código<input name="codigo" placeholder="TAB-04" required></label>
+      <label>Tag RFID<div style="display:flex;gap:8px"><input name="tag" required><button type="button" class="btn sec sm" onclick="lerTag(this)">Ler do armário</button></div></label>
+      <button class="btn">Cadastrar tablet</button>
+    </form>
+  </div>
+  <div class="card tbl" id="tProf" style="margin-top:20px"></div>
+  <div class="linha" id="boxDemo" style="display:none"><button class="btn sec" onclick="act('exemplo',{})">Carregar dados de exemplo</button></div>
+</section>
+</main>
+
+<dialog id="dlg"><div id="dbody"></div></dialog>
+<dialog id="login">
+  <form id="fLogin">
+    <h2>Entrar no TabControl</h2>
+    <label>Usuário<input name="usuario" autocomplete="username" required></label>
+    <label>Senha<input type="password" name="senha" autocomplete="current-password" required></label>
+    <p id="loginMsg" class="aviso" style="display:none"></p>
+    <button class="btn">Entrar</button>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11):'—';
+let BMIN=50;   // limite de bateria: vem do servidor (/api/config), nao fica mais fixo aqui
+const bat=b=>b<BMIN?'var(--red)':b<BMIN+20?'var(--amber)':'var(--green)';
+const ST={disponivel:['Livre','var(--green)'],emprestado:['Emprestado','var(--blue)'],manutencao:['Manutenção','var(--red)']};
+let S={tablets:[],profs:[],reservas:[],hist:[],obs:[],eventos:[],disp:[]};
+
+const api=async(u,b)=>{
+  const r=await fetch('/api/'+u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:undefined);
+  if(r.status==401&&u!='login'){pedirLogin();throw new Error('login')}   // sessao expirou: pede login
+  return r.json();
+};
+
+function pedirLogin(){if(!$('#login').open)$('#login').showModal()}
+$('#login').addEventListener('cancel',e=>e.preventDefault());   // Esc nao fecha o login
+$('#fLogin').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const r=await api('login',Object.fromEntries(new FormData(e.target)));
+  const m=$('#loginMsg');
+  if(r.ok){m.style.display='none';e.target.reset();$('#login').close();load()}
+  else{m.textContent=r.msg;m.style.display='block'}
+});
+async function sair(){await api('logout',{}).catch(()=>{});location.reload()}
+
+async function lerTag(btn){
+  const r=await api('ultima_tag');
+  if(r.uid){btn.closest('form').querySelector('[name=tag]').value=r.uid;toast('Tag '+r.uid+' preenchida.',true)}
+  else toast('Nenhuma tag nova nos últimos 5 minutos. Passe a tag no leitor e tente de novo.',false);
+}
+
+async function load(){
+  try{
+    const c=await api('config');BMIN=c.bateria_minima;
+    $('#boxDemo').style.display=c.demo?'':'none';
+    [S.tablets,S.profs,S.reservas,S.hist,S.obs,S.eventos,S.disp]=await Promise.all(
+      ['tablets','professores','reservas','historico','observacoes','eventos','dispositivos'].map(u=>api(u)));
+    render();
+  }catch(e){}
+}
+// atualiza sozinho (retiradas feitas pelo leitor aparecem sem recarregar a pagina)
+async function atualizar(){
+  if($('#login').open)return;
+  try{
+    [S.tablets,S.hist,S.eventos,S.disp]=await Promise.all(['tablets','historico','eventos','dispositivos'].map(u=>api(u)));
+    render(false);
+  }catch(e){}
+}
+setInterval(atualizar,8000);
+function toast(m,ok){const t=$('#toast');t.textContent=m;t.className='on'+(ok?'':' erro');clearTimeout(t.h);t.h=setTimeout(()=>t.className='',3800)}
+async function act(u,d,fechar){
+  let r;try{r=await api(u,d)}catch(e){return false}
+  toast(r.msg,r.ok);
+  if(r.ok){if(fechar)$('#dlg').close();await load()}
+  return r.ok;
+}
+document.addEventListener('submit',async e=>{
+  const f=e.target;if(!f.dataset.act)return;e.preventDefault();
+  if(await act(f.dataset.act,Object.fromEntries(new FormData(f)),'close' in f.dataset))f.reset();
+});
+$$('nav button').forEach(b=>b.onclick=()=>{
+  $$('nav button,.view').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');
+});
+
+const tabela=(cols,linhas,vazio)=>linhas.length
+  ?`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${linhas.join('')}</tbody></table>`
+  :`<p class="vazio">${vazio}</p>`;
+const chip=(t,c)=>`<span class="chip" style="--c:${c}">${t}</span>`;
+
+function slot(t){
+  const [l,c]=ST[t.status];
+  const nota=t.status=='emprestado'?'Com '+esc(t.com):t.hardware!='ok'?'Hardware com defeito':t.conferir?'Conferir bateria':t.bateria<BMIN?'Bateria baixa, bloqueado':'Pronto para retirada';
+  return `<button class="slot" style="--c:${c}" onclick="abrir('${esc(t.codigo)}')">
+    <div class="top"><b>${esc(t.codigo)}</b>${chip(l,c)}</div>
+    <div class="tab"><i style="height:${t.bateria}%;background:${bat(t.bateria)}"></i><span>${t.bateria}%</span></div>
+    <small>${nota}</small></button>`;
+}
+
+function render(full=true){
+  const n=s=>S.tablets.filter(t=>t.status==s).length;
+  $('#resumo').innerHTML=[['disponivel','Livres'],['emprestado','Emprestados'],['manutencao','Em manutenção']]
+    .map(([s,l])=>`<span><i class="dot" style="--c:${ST[s][1]}"></i><b>${n(s)}</b> ${l}</span>`).join('')
+    +`<span><i class="dot" style="--c:var(--amber)"></i><b>${S.tablets.filter(t=>t.bateria<BMIN).length}</b> Bateria baixa</span>`;
+  $('#cabinet').innerHTML=S.tablets.length?S.tablets.map(slot).join('')
+    :'<p class="vazio" style="grid-column:1/-1">Nenhum tablet cadastrado. Vá em Cadastros para adicionar o primeiro.</p>';
+
+  renderHist();renderLeituras();
+  if(!full)return;   // no auto-refresh nao mexe nos formularios que a pessoa pode estar preenchendo
+
+  $$('select.sp').forEach(s=>s.innerHTML=(s.dataset.opt?'<option value="">Anônimo</option>':'')+S.profs.map(p=>`<option value="${esc(p.tag_rfid)}">${esc(p.nome)}</option>`).join(''));
+  $$('select.st').forEach(s=>s.innerHTML=S.tablets.map(t=>`<option>${esc(t.codigo)}</option>`).join(''));
+
+  const rc={ativa:'var(--blue)',concluida:'var(--green)',cancelada:'var(--mute)'};
+  $('#tReservas').innerHTML=tabela(['Professor','Tablet','Início','Fim','Situação',''],S.reservas.map(r=>
+    `<tr><td>${esc(r.nome)}</td><td>${esc(r.codigo)}</td><td>${fmt(r.inicio)}</td><td>${fmt(r.fim)}</td><td>${chip(r.status,rc[r.status])}</td>
+    <td>${r.status=='ativa'?`<button class="btn sec sm" onclick="act('cancelar',{id:${r.id},tag_professor:'${esc(r.tag_professor)}'})">Cancelar</button>`:''}</td></tr>`),
+    'Nenhuma reserva ainda. Use o formulário ao lado para criar a primeira.');
+
+  $('#lObs').innerHTML=S.obs.length?'<h2>Registros</h2>'+S.obs.map(o=>
+    `<div class="obs"><b>${esc(o.codigo)}</b> <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
+    :'<p class="vazio">Nenhuma observação registrada.</p>';
+
+  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID'],S.profs.map(p=>
+    `<tr><td>${esc(p.nome)}</td><td>${esc(p.email)}</td><td>${esc(p.tag_rfid)}</td></tr>`),
+    'Nenhum professor cadastrado.');
+}
+
+function renderHist(){
+  $('#tHist').innerHTML=tabela(['Professor','Tablet','Retirada','Devolução','Bateria (saída / volta)'],S.hist.map(h=>
+    `<tr><td>${esc(h.nome)}</td><td>${esc(h.codigo)}</td><td>${fmt(h.retirada)}</td>
+    <td>${h.devolucao?fmt(h.devolucao):chip('Em uso','var(--blue)')}</td>
+    <td>${h.bateria_retirada}% / ${h.bateria_pendente?chip('a confirmar','var(--amber)'):h.bateria_devolucao==null?'—':h.bateria_devolucao+'%'}</td></tr>`),
+    'Ainda não há retiradas. Elas aparecem aqui assim que um tablet for retirado.');
+}
+
+function renderLeituras(){
+  $('#tDisp').innerHTML=S.disp.length?S.disp.map(d=>{
+    const on=d.visto_ha_seg<90;
+    return `<span><i class="dot" style="--c:${on?'var(--green)':'var(--red)'}"></i><b>${esc(d.dispositivo)}</b> ${on?'online':'sem sinal'} (visto há ${d.visto_ha_seg}s)</span>`}).join('')
+    :'<span>Nenhum leitor se conectou desde que o servidor iniciou.</span>';
+  $('#tEventos').innerHTML=tabela(['Quando','Leitor','Tag','Tipo','Resultado'],S.eventos.map(e=>
+    `<tr><td>${fmt(e.quando)}</td><td>${esc(e.dispositivo)}</td><td>${esc(e.uid)}</td><td>${esc(e.tipo)}</td>
+    <td>${chip(e.ok?'ok':'negado',e.ok?'var(--green)':'var(--red)')} ${esc(e.mensagem)}</td></tr>`),
+    'Nenhuma leitura recebida ainda.');
+}
+
+function abrir(codigo){
+  const t=S.tablets.find(x=>x.codigo==codigo);
+  const [l,c]=ST[t.status];
+  const leitura=`<form data-act="status" data-close style="margin-top:18px"><input type="hidden" name="codigo" value="${esc(t.codigo)}">
+    <h2>Atualizar leitura</h2>
+    <label>Bateria (%)<input name="bateria" type="number" min="0" max="100" value="${t.bateria}" required></label>
+    <label>Hardware<select name="hardware"><option value="ok">Funcionando</option><option value="defeito"${t.hardware!='ok'?' selected':''}>Com defeito</option></select></label>
+    <button class="btn sec">Salvar leitura</button></form>`;
+  let corpo;
+  if(t.status=='emprestado'){
+    corpo=`<p style="margin:10px 0">Com <b>${esc(t.com)}</b>. Informe a leitura atual ao devolver.</p>
+    <form data-act="devolver" data-close><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
+    <label>Bateria (%)<input name="bateria" type="number" min="0" max="100" value="${t.bateria}" required></label>
+    <label>Hardware<select name="hardware"><option value="ok">Funcionando</option><option value="defeito">Com defeito</option></select></label>
+    <button class="btn">Registrar devolução</button></form>`;
+  }else if(t.status=='manutencao'){
+    corpo=`<p class="aviso" style="margin:12px 0">Em manutenção, não pode ser retirado. Marque o hardware como funcionando para liberar.</p>`+leitura;
+  }else{
+    corpo=(t.conferir?`<p class="aviso" style="margin:12px 0">Devolvido pelo leitor RFID: confira a bateria e o hardware e salve a leitura abaixo.</p>`:'')+
+    (t.bateria<BMIN?`<p class="aviso" style="margin:12px 0">Bateria em ${t.bateria}%. A retirada fica bloqueada abaixo de ${BMIN}%.</p>`:'')+
+    (S.profs.length?`<form data-act="retirar" data-close style="margin-top:14px"><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
+      <label>Quem está retirando<select name="tag_professor">${S.profs.map(p=>`<option value="${esc(p.tag_rfid)}">${esc(p.nome)}</option>`).join('')}</select></label>
+      <button class="btn">Retirar tablet</button></form>`:'<p class="vazio">Cadastre um professor antes de retirar.</p>')+leitura;
+  }
+  $('#dbody').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="font-size:24px">${esc(t.codigo)}</h1>${chip(l,c)}</div>
+    <small style="color:var(--mute)">Tag ${esc(t.tag_rfid)}, bateria ${t.bateria}%</small>${corpo}
+    <div class="linha"><button class="btn sec sm" onclick="$('#dlg').close()">Fechar</button></div>`;
+  $('#dlg').showModal();
+}
+load();
+</script>
+</body>
+</html>
