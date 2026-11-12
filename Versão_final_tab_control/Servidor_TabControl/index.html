@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TabControl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EDF1F5;--card:#fff;--ink:#14233A;--mute:#5B6B80;--line:#D5DDE7;--blue:#0A5CA8;--navy:#0B2F55;--green:#1E9E6A;--amber:#D99A00;--red:#CF3F3F;--font:'Figtree',system-ui,sans-serif;--disp:'Bricolage Grotesque','Figtree',system-ui,sans-serif}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 var(--font);color:var(--ink);background:var(--bg);display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+aside{background:var(--navy);color:#fff;padding:26px 14px;display:flex;flex-direction:column;gap:30px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px}
+.brand b{font:700 21px var(--disp);display:block;line-height:1.1}
+.brand small{font-size:12px;opacity:.7}
+.logo{flex:none;width:24px;height:34px;border:2.5px solid #fff;border-radius:7px;position:relative}
+.logo::after{content:"";position:absolute;left:50%;bottom:3px;width:6px;height:2px;background:#fff;transform:translateX(-50%)}
+nav{display:flex;flex-direction:column;gap:3px}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:7px;color:#C9D8EA;font-weight:500}
+nav button:hover{background:rgba(255,255,255,.08)}
+nav button.on{background:#fff;color:var(--navy);font-weight:600}
+main{padding:34px 40px 60px;max-width:1180px;width:100%}
+h1{font:700 30px/1.15 var(--disp);letter-spacing:-.01em}
+.sub{color:var(--mute);margin:4px 0 24px}
+h2{font:600 17px var(--disp);margin-bottom:12px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+.grid2{display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:20px;align-items:start}
+.resumo{display:flex;flex-wrap:wrap;gap:22px;margin-bottom:18px;color:var(--mute)}
+.resumo span{display:flex;align-items:center;gap:8px}
+.resumo b{color:var(--ink);font-size:18px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.cabinet{background:#C9D3DF;border:1px solid #B5C1D0;border-radius:14px;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.slot{all:unset;box-sizing:border-box;cursor:pointer;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;border-bottom:4px solid var(--c)}
+.slot:hover{outline:2px solid var(--blue)}
+.slot .top{display:flex;justify-content:space-between;align-items:center;width:100%}
+.slot small{color:var(--mute);font-size:12.5px;text-align:center;min-height:19px}
+.chip{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:color-mix(in srgb,var(--c) 14%,#fff);color:color-mix(in srgb,var(--c) 75%,#000)}
+.tab{position:relative;width:74px;height:100px;border:3px solid var(--ink);border-radius:11px;overflow:hidden;background:#E8EEF4}
+.tab i{position:absolute;left:0;right:0;bottom:0;opacity:.88}
+.tab span{position:absolute;inset:0;display:grid;place-items:center;font:700 19px var(--disp)}
+form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--mute)}
+input,select,textarea{font:inherit;color:var(--ink);padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:#fff;width:100%}
+textarea{min-height:84px;resize:vertical}
+:is(input,select,textarea,button,a):focus-visible{outline:3px solid #7DB4E8;outline-offset:1px}
+.btn{font:600 15px var(--font);border:0;border-radius:6px;padding:10px 16px;cursor:pointer;background:var(--blue);color:#fff}
+.btn:hover{background:#084a89}
+.btn.sec{background:#E4EBF3;color:var(--ink)}.btn.sec:hover{background:#D5DFEB}
+.btn.sm{padding:5px 10px;font-size:13px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:13px;color:var(--mute);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid #E8EDF3;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.vazio{color:var(--mute);padding:22px 12px;white-space:normal}
+.obs{padding:12px 0;border-bottom:1px solid #E8EDF3}.obs:last-child{border:0}
+.obs small{color:var(--mute)}
+.aviso{background:#FDF3D6;border-radius:6px;padding:9px 12px;font-size:14px}
+dialog{border:0;border-radius:14px;padding:26px;width:min(400px,92vw);color:var(--ink)}
+dialog::backdrop{background:rgba(11,47,85,.45)}
+#toast{position:fixed;right:22px;bottom:22px;padding:12px 18px;border-radius:8px;color:#fff;font-weight:500;background:var(--green);transform:translateY(90px);transition:transform .25s;max-width:380px;z-index:9}
+#toast.on{transform:none}#toast.erro{background:var(--red)}
+.linha{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+
+
+.date-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint,.form-note{font-size:12px;color:var(--mute);line-height:1.45}
+.cad-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 20px}
+.stat-card{background:linear-gradient(135deg,#fff,#F5F8FC);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:3px}
+.stat-card span{font-size:13px;color:var(--mute);font-weight:600}
+.stat-card strong{font:700 30px/1.2 var(--disp);color:var(--navy)}
+.stat-card small{font-size:12px;color:var(--mute)}
+.cad-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
+.cad-form{display:flex;flex-direction:column;gap:15px}
+.cad-form .btn{margin-top:auto}
+.form-heading{display:flex;align-items:center;gap:12px;margin-bottom:2px}
+.form-heading h2{margin:0 0 3px}
+.form-heading p,.list-heading p{font-size:13px;color:var(--mute)}
+.form-icon{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:#E1EFFB;color:var(--blue);font:700 18px var(--disp);flex:none}
+.tablet-icon{background:#E0F5EB;color:#137A50}
+.cad-list{margin-top:20px}
+.list-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}
+.list-heading h2{margin-bottom:3px}
+.search-label{width:min(330px,100%);flex:none}
+.tag-code{font:500 12px ui-monospace,SFMono-Regular,Consolas,monospace;background:#EEF3F8;padding:4px 7px;border-radius:5px}.cad-list table tbody tr:hover{background:#F6F9FC}
+.cad-list th{background:#F7F9FC}
+
+/* ---- Aba Histórico ---- */
+.hist-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.hist-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
+.hist-top h2{margin-bottom:3px}.hist-top p{font-size:13px;color:var(--mute)}
+.filtros{display:grid;grid-template-columns:minmax(200px,2fr) repeat(4,minmax(125px,1fr)) auto;gap:12px;align-items:end;margin-bottom:16px}
+.filtros .btn{height:40px}
+.hist td small{display:block;color:var(--mute);font-size:12px;line-height:1.35}
+.hist-foot{margin-top:12px}
+.btn.perigo{background:#FBE4E4;color:#A82727}.btn.perigo:hover{background:#F5CFCF}
+.tbl td.acao,.tbl th.acao{text-align:right;width:1%}
+@media(max-width:1100px){.hist-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.filtros{grid-template-columns:repeat(2,minmax(0,1fr))}.filtros .btn{grid-column:1/-1}}
+@media(max-width:700px){
+ .cad-stats{grid-template-columns:1fr}
+ .cad-grid{grid-template-columns:1fr}
+ .list-heading{flex-direction:column}
+ .search-label{width:100%}
+ .date-row{grid-template-columns:1fr 1fr}
+}
+
+@media(max-width:860px){
+ body{grid-template-columns:1fr}
+ aside{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:14px;gap:12px}
+ nav{flex-direction:row;flex-wrap:wrap}
+ main{padding:24px 16px 50px}.grid2{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand"><div class="logo"></div><div><b>TabControl</b><small>Centro WEG</small></div></div>
+  <nav>
+    <button data-v="painel" class="on">Armário</button>
+    <button data-v="reservas">Reservas</button>
+    <button data-v="historico">Histórico</button>
+    <button data-v="obs">Observações</button>
+    <button data-v="cadastros">Cadastros</button>
+  </nav>
+</aside>
+
+<main>
+<section class="view on" id="painel">
+  <h1>Armário de tablets</h1>
+  <p class="sub">Clique em um tablet para consultar a leitura automática, retirar, devolver ou registrar o estado do hardware.</p>
+  <div class="resumo" id="resumo"></div>
+  <div class="cabinet" id="cabinet"></div>
+</section>
+
+<section class="view" id="reservas">
+  <h1>Reservas</h1>
+  <p class="sub">Reserve com até 7 dias de antecedência. Horários não podem se sobrepor.</p>
+  <div class="grid2">
+    <form class="card" data-act="reservar">
+      <h2>Nova reserva</h2>
+      <label>Professor<select class="sp" name="tag_professor" required></select></label>
+      <label>Tablet<select class="st" name="codigo" required></select></label>
+      <div class="date-row">
+        <label>Data de início (DD/MM)<input type="text" name="inicio_data" placeholder="22/10" inputmode="numeric" pattern="\\d{2}/\\d{2}" maxlength="5" required></label>
+        <label>Horário<input type="time" name="inicio_hora" required></label>
+      </div>
+      <div class="date-row">
+        <label>Data de término (DD/MM)<input type="text" name="fim_data" placeholder="22/10" inputmode="numeric" pattern="\\d{2}/\\d{2}" maxlength="5" required></label>
+        <label>Horário<input type="time" name="fim_hora" required></label>
+      </div>
+      <p class="hint">O ano atual será preenchido automaticamente. Para reservas de outro ano, fale com o responsável pelo sistema.</p>
+      <button class="btn">Reservar tablet</button>
+    </form>
+    <div class="card tbl" id="tReservas"></div>
+  </div>
+</section>
+
+<section class="view" id="historico">
+  <h1>Histórico</h1>
+  <p class="sub">Registro completo dos empréstimos: quem retirou, qual equipamento, quando saiu e quando voltou.</p>
+  <div class="cad-stats hist-stats" id="histStats"></div>
+  <div class="card cad-list hist" style="margin-top:0">
+    <div class="hist-top">
+      <div><h2>Empréstimos registrados</h2><p>Os mais recentes aparecem primeiro. Os filtros valem também para a exportação.</p></div>
+      <button class="btn sec" id="btnExportar" type="button">Exportar CSV</button>
+    </div>
+    <div class="filtros">
+      <label>Buscar<input id="fBusca" type="search" placeholder="Professor, e-mail, tablet ou tag…"></label>
+      <label>Situação<select id="fStatus"><option value="">Todas</option><option value="uso">Em uso</option><option value="devolvido">Devolvidos</option></select></label>
+      <label>Tablet<select id="fTablet"></select></label>
+      <label>Retirada de<input type="date" id="fDe"></label>
+      <label>Retirada até<input type="date" id="fAte"></label>
+      <button class="btn sec" id="fLimpar" type="button">Limpar</button>
+    </div>
+    <div class="tbl" id="tHist"></div>
+    <p class="hint hist-foot" id="histRodape"></p>
+  </div>
+</section>
+
+<section class="view" id="obs">
+  <h1>Observações</h1>
+  <p class="sub">Registre problemas e reclamações sobre um tablet.</p>
+  <div class="grid2">
+    <form class="card" data-act="observacao">
+      <h2>Nova observação</h2>
+      <label>Tablet<select class="st" name="codigo" required></select></label>
+      <label>Tipo<select name="tipo"><option value="defeito">Defeito (bloqueia o tablet)</option><option value="observacao">Observação geral</option></select></label>
+      <label>Professor<select class="sp" data-opt="1" name="tag_professor"></select></label>
+      <label>O que aconteceu<textarea name="texto" required></textarea></label>
+      <p class="hint">Um defeito bloqueia retiradas e novas reservas e coloca o tablet em manutenção. Para liberar depois, abra o tablet no Armário e salve a leitura com o hardware "Funcionando".</p>
+      <button class="btn">Registrar observação</button>
+    </form>
+    <div class="card" id="lObs"></div>
+  </div>
+</section>
+
+<section class="view" id="cadastros">
+  <h1>Cadastros</h1>
+  <p class="sub">Gerencie professores e tablets em um só lugar. Cada cadastro precisa de uma tag RFID única.</p>
+  <div class="cad-stats" id="cadStats">
+    <div class="stat-card"><span>Professores cadastrados</span><strong id="totalProf">0</strong><small>Usuários autorizados</small></div>
+    <div class="stat-card"><span>Tablets cadastrados</span><strong id="totalTab">0</strong><small>Equipamentos no sistema</small></div>
+    <div class="stat-card"><span>Tablets disponíveis</span><strong id="totalDisp">0</strong><small>Prontos para retirada</small></div>
+  </div>
+  <div class="cad-grid">
+    <form class="card cad-form" data-act="professor">
+      <div class="form-heading"><span class="form-icon">P</span><div><h2>Novo professor</h2><p>Adicione uma pessoa autorizada a retirar tablets.</p></div></div>
+      <label>Nome completo<input name="nome" placeholder="Ex.: Maria da Silva" autocomplete="name" required></label>
+      <label>Email institucional<input type="email" name="email" placeholder="nome@escola.com.br" autocomplete="email" required></label>
+      <label>Tag RFID<input name="tag" placeholder="Aproxime ou digite a tag" required></label>
+      <button class="btn" type="submit">Cadastrar professor</button>
+    </form>
+    <form class="card cad-form" data-act="tablet">
+      <div class="form-heading"><span class="form-icon tablet-icon">T</span><div><h2>Novo tablet</h2><p>Registre um equipamento no armário.</p></div></div>
+      <label>Código do tablet<input name="codigo" placeholder="Ex.: TAB-04" required></label>
+      <label>Tag RFID<input name="tag" placeholder="Aproxime ou digite a tag" required></label>
+      <div class="form-note">Dica: use um código curto e único para identificar o equipamento rapidamente.</div>
+      <button class="btn" type="submit">Cadastrar tablet</button>
+    </form>
+  </div>
+  <div class="card cad-list">
+    <div class="list-heading"><div><h2>Professores cadastrados</h2><p>Consulte os dados registrados no sistema.</p></div><label class="search-label">Buscar professor<input id="buscaProf" type="search" placeholder="Nome, email ou tag RFID…"></label></div>
+    <div class="tbl" id="tProf"></div>
+  </div>
+  <div class="card cad-list">
+    <div class="list-heading"><div><h2>Tablets cadastrados</h2><p>Equipamentos do armário e a situação de cada um.</p></div></div>
+    <div class="tbl" id="tTabs"></div>
+  </div>
+  <div class="linha"><button class="btn sec" onclick="act('exemplo',{})">Carregar dados de exemplo</button></div>
+</section>
+</main>
+
+<dialog id="dlg"><div id="dbody"></div></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11):'—';
+let BAT_MIN=50; // o valor real vem do servidor (/api/config)
+let BAT_MAX_AGE=30;
+const leituraBateria=t=>{
+  if(!t.bateria_atualizada_em) return {fresca:false,minutos:null};
+  const ms=Date.parse(t.bateria_atualizada_em);
+  if(!Number.isFinite(ms)) return {fresca:false,minutos:null};
+  const idadeMs=Date.now()-ms;
+  if(idadeMs<0) return {fresca:false,minutos:null};
+  const minutos=Math.floor(idadeMs/60000);
+  return {fresca:idadeMs<=BAT_MAX_AGE*60000,minutos};
+};
+const bat=b=>b<BAT_MIN?'var(--red)':b<BAT_MIN+20?'var(--amber)':'var(--green)';
+const ST={disponivel:['Livre','var(--green)'],emprestado:['Emprestado','var(--blue)'],manutencao:['Manutenção','var(--red)']};
+let S={tablets:[],profs:[],reservas:[],hist:[],obs:[]};
+
+const api=async(u,b)=>{
+  const resposta=await fetch('/api/'+u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:undefined);
+  let dados;
+  try{dados=await resposta.json()}catch(e){throw new Error(`A API /api/${u} não retornou JSON válido (HTTP ${resposta.status}).`)}
+  // Respostas esperadas de ações (inclusive duplicidade) continuam chegando ao toast.
+  // Falhas em consultas GET são lançadas para não deixar o painel aparentar estar vazio.
+  if(!resposta.ok && !(b && dados && typeof dados.ok==='boolean'))
+    throw new Error(dados.erro||dados.msg||`Falha em /api/${u} (HTTP ${resposta.status}).`);
+  return dados;
+};
+
+async function load(){
+  try{
+    const config=await api('config');
+    BAT_MIN=config.bateria_minima;
+    BAT_MAX_AGE=config.bateria_max_idade_min;
+    const rotas=['tablets','professores','reservas','historico','observacoes'];
+    const dados=await Promise.all(rotas.map(u=>api(u)));
+    const invalida=dados.findIndex(item=>!Array.isArray(item));
+    if(invalida!==-1)throw new Error(`A consulta /api/${rotas[invalida]} não retornou uma lista.`);
+    [S.tablets,S.profs,S.reservas,S.hist,S.obs]=dados;
+    render();
+  }catch(erro){
+    console.error('Falha ao carregar os dados do TabControl:',erro);
+    toast('Não foi possível carregar os dados do banco: '+erro.message,false);
+  }
+}
+function toast(m,ok){const t=$('#toast');t.textContent=m;t.className='on'+(ok?'':' erro');clearTimeout(t.h);t.h=setTimeout(()=>t.className='',3800)}
+async function act(u,d,fechar){
+  const r=await api(u,d);toast(r.msg,r.ok);
+  if(r.ok){if(fechar)$('#dlg').close();await load()}
+  return r.ok;
+}
+document.addEventListener('submit',async e=>{
+  const f=e.target;if(!f.dataset.act)return;e.preventDefault();
+  const dados=Object.fromEntries(new FormData(f));
+  if(f.dataset.act==='reservar'){
+    const ano=new Date().getFullYear();
+    const montar=(data,hora)=>{
+      const [dia,mes]=data.split('/').map(Number);
+      const d=new Date(ano,mes-1,dia);
+      if(d.getFullYear()!==ano||d.getMonth()!==mes-1||d.getDate()!==dia)throw new Error('Confira a data: use DD/MM.');
+      return `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}T${hora}`;
+    };
+    try{
+      dados.inicio=montar(dados.inicio_data,dados.inicio_hora);
+      dados.fim=montar(dados.fim_data,dados.fim_hora);
+    }catch(err){toast(err.message,false);return;}
+    delete dados.inicio_data;delete dados.inicio_hora;delete dados.fim_data;delete dados.fim_hora;
+  }
+  if(await act(f.dataset.act,dados,'close' in f.dataset))f.reset();
+});
+$$('nav button').forEach(b=>b.onclick=()=>{
+  $$('nav button,.view').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');if(b.dataset.v==='historico')load();
+});
+
+const tabela=(cols,linhas,vazio)=>linhas.length
+  ?`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${linhas.join('')}</tbody></table>`
+  :`<p class="vazio">${vazio}</p>`;
+const chip=(t,c)=>`<span class="chip" style="--c:${c}">${t}</span>`;
+
+function slot(t){
+  const [l,c]=ST[t.status];
+  const leitura=leituraBateria(t);
+  const avisoLeitura=!leitura.fresca
+    ?(leitura.minutos===null?'Sem leitura automática':'Leitura antiga ('+leitura.minutos+' min)')
+    :null;
+  const nota=avisoLeitura
+    ?(t.status==='emprestado'?'Com '+esc(t.com)+' · '+avisoLeitura:avisoLeitura)
+    :t.status==='emprestado'?'Com '+esc(t.com)+(t.hardware!=='ok'?' (com defeito)':'')
+    :t.hardware!=='ok'?'Hardware com defeito'
+    :t.bateria<BAT_MIN?'Bateria baixa, bloqueado':'Pronto para retirada';
+  return `<button class="slot" style="--c:${c}" onclick="abrir('${esc(t.codigo)}')">
+    <div class="top"><b>${esc(t.codigo)}</b>${chip(l,c)}</div>
+    <div class="tab"><i style="height:${t.bateria}%;background:${bat(t.bateria)}"></i><span>${t.bateria}%</span></div>
+    <small>${nota}</small></button>`;
+}
+
+function renderProfessores(){
+  const campo=$('#buscaProf');
+  if(!campo)return;
+  const busca=campo.value.trim().toLocaleLowerCase('pt-BR');
+  const lista=S.profs.filter(p=>[p.nome,p.email,p.tag_rfid].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(busca)));
+  $('#tProf').innerHTML=tabela(['Professor','Email','Tag RFID',''],lista.map(p=>
+    `<tr><td><b>${esc(p.nome)}</b></td><td>${esc(p.email)}</td><td><span class="tag-code">${esc(p.tag_rfid)}</span></td><td class="acao"><button class="btn perigo sm" onclick="excluir('professor',${p.id})">Excluir</button></td></tr>`),
+    busca?'Nenhum professor corresponde à busca.':'Nenhum professor cadastrado. Cadastre o primeiro usando o formulário acima.');
+}
+$('#buscaProf')?.addEventListener('input',renderProfessores);
+
+function renderResumo(){
+  const n=s=>S.tablets.filter(t=>t.status==s).length;
+  $('#resumo').innerHTML=[['disponivel','Livres'],['emprestado','Emprestados'],['manutencao','Em manutenção']]
+    .map(([s,l])=>`<span><i class="dot" style="--c:${ST[s][1]}"></i><b>${n(s)}</b> ${l}</span>`).join('')
+    +`<span><i class="dot" style="--c:var(--amber)"></i><b>${S.tablets.filter(t=>t.bateria<BAT_MIN).length}</b> Bateria baixa</span>`
+    +`<span><i class="dot" style="--c:var(--red)"></i><b>${S.tablets.filter(t=>!leituraBateria(t).fresca).length}</b> Leitura vencida</span>`;
+}
+function render(){
+  renderResumo();
+  $('#cabinet').innerHTML=S.tablets.length?S.tablets.map(slot).join('')
+    :'<p class="vazio" style="grid-column:1/-1">Nenhum tablet cadastrado. Vá em Cadastros para adicionar o primeiro.</p>';
+
+  $$('select.sp').forEach(s=>s.innerHTML=(s.dataset.opt?'<option value="">Anônimo</option>':'')+S.profs.map(p=>`<option value="${esc(p.tag_rfid)}">${esc(p.nome)}</option>`).join(''));
+  $$('select.st').forEach(s=>s.innerHTML=S.tablets.map(t=>`<option>${esc(t.codigo)}</option>`).join(''));
+
+  const rc={ativa:'var(--blue)',concluida:'var(--green)',cancelada:'var(--mute)'};
+  $('#tReservas').innerHTML=tabela(['Professor','Tablet','Início','Fim','Situação',''],S.reservas.map(r=>
+    `<tr><td>${esc(r.nome)}</td><td>${esc(r.codigo)}</td><td>${fmt(r.inicio)}</td><td>${fmt(r.fim)}</td><td>${chip(r.status,rc[r.status])}</td>
+    <td>${r.status=='ativa'?`<button class="btn sec sm" onclick="act('cancelar',{id:${r.id},tag_professor:'${esc(r.tag_professor)}'})">Cancelar</button>`:''}</td></tr>`),
+    'Nenhuma reserva ainda. Use o formulário ao lado para criar a primeira.');
+
+  renderHistorico();
+
+  $('#lObs').innerHTML=S.obs.length?'<h2>Registros</h2>'+S.obs.map(o=>
+    `<div class="obs"><b>${esc(o.codigo)}</b> ${tipoObs(o)} <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
+    :'<p class="vazio">Nenhuma observação registrada.</p>';
+
+  $('#totalProf').textContent=S.profs.length;
+  $('#totalTab').textContent=S.tablets.length;
+  $('#totalDisp').textContent=S.tablets.filter(t=>t.status==='disponivel').length;
+  renderProfessores();
+  renderTabletsCad();
+}
+
+const tipoObs=o=>o.tipo==='defeito'?(o.resolvido?chip('Defeito resolvido','var(--green)'):chip('Defeito','var(--red)')):'';
+
+/* ---------- Exclusão de cadastros ---------- */
+function renderTabletsCad(){
+  $('#tTabs').innerHTML=tabela(['Tablet','Tag RFID','Bateria','Situação',''],S.tablets.map(t=>{
+    const [l,c]=ST[t.status];
+    return `<tr><td><b>${esc(t.codigo)}</b></td><td><span class="tag-code">${esc(t.tag_rfid)}</span></td><td>${t.bateria}%<small>${leituraBateria(t).fresca?'Leitura recente':'Sem leitura recente'}</small></td><td>${chip(l,c)}</td>
+    <td class="acao"><button class="btn perigo sm" onclick="excluir('tablet',${t.id})">Excluir</button></td></tr>`;
+  }),'Nenhum tablet cadastrado. Cadastre o primeiro usando o formulário acima.');
+}
+async function excluir(tipo,id){
+  const item=tipo==='professor'?S.profs.find(p=>p.id===id):S.tablets.find(t=>t.id===id);
+  if(!item)return;
+  const nome=tipo==='professor'?item.nome:item.codigo;
+  if(!confirm(`Excluir ${tipo==='professor'?'o professor':'o tablet'} "${nome}"?`))return;
+  let r=await api('excluir_'+tipo,{id});
+  if(r.confirmar){
+    if(!confirm(r.msg+'\n\nEssa ação não pode ser desfeita. Excluir mesmo assim?'))return;
+    r=await api('excluir_'+tipo,{id,forcar:true});
+  }
+  toast(r.msg,r.ok);
+  if(r.ok)await load();
+}
+
+/* ---------- Histórico ---------- */
+const fmtCompleto=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4)+' '+s.slice(11,16):'—';
+const paraData=s=>new Date(s.replace(' ','T'));
+const minutosDe=h=>Math.max(0,Math.round(((h.devolucao?paraData(h.devolucao):new Date())-paraData(h.retirada))/60000));
+function duracao(m){
+  if(m<1)return '< 1 min';
+  const d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mi=m%60;
+  if(d)return d+' d'+(hh?' '+hh+' h':'');
+  if(hh)return hh+' h'+(mi?' '+mi+' min':'');
+  return mi+' min';
+}
+function filtrarHistorico(){
+  const q=$('#fBusca').value.trim().toLocaleLowerCase('pt-BR'),st=$('#fStatus').value,
+        tb=$('#fTablet').value,de=$('#fDe').value,ate=$('#fAte').value;
+  return S.hist.filter(h=>{
+    if(q&&![h.nome,h.email,h.codigo,h.tag_professor,h.tag_tablet].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(q)))return false;
+    if(st==='uso'&&h.devolucao)return false;
+    if(st==='devolvido'&&!h.devolucao)return false;
+    if(tb&&h.codigo!==tb)return false;
+    const dia=h.retirada.slice(0,10);
+    if(de&&dia<de)return false;
+    if(ate&&dia>ate)return false;
+    return true;
+  });
+}
+function bateriaHist(h){
+  const a=h.bateria_retirada,b=h.bateria_devolucao;
+  if(a==null&&b==null)return '—';
+  const texto=(a==null?'—':a+'%')+' → '+(b==null?'—':b+'%');
+  if(a==null||b==null)return texto;
+  const d=a-b;
+  const nota=d>0?'consumiu '+d+'%':d<0?'carregou '+(-d)+'%':'sem variação';
+  return texto+'<small>'+nota+'</small>';
+}
+function renderHistorico(){
+  const sel=$('#fTablet'),atual=sel.value;
+  sel.innerHTML='<option value="">Todos</option>'+S.tablets.map(t=>`<option value="${esc(t.codigo)}">${esc(t.codigo)}</option>`).join('');
+  sel.value=atual;
+
+  const lista=filtrarHistorico();
+  const devolvidos=lista.filter(h=>h.devolucao);
+  const media=devolvidos.length?Math.round(devolvidos.reduce((s,h)=>s+minutosDe(h),0)/devolvidos.length):null;
+  $('#histStats').innerHTML=[
+    ['Empréstimos',lista.length,'Dentro dos filtros atuais'],
+    ['Em uso agora',lista.length-devolvidos.length,'Ainda não devolvidos'],
+    ['Devolvidos',devolvidos.length,'Ciclo concluído'],
+    ['Tempo médio de uso',media==null?'—':duracao(media),'Considera só os devolvidos']
+  ].map(([t,v,s])=>`<div class="stat-card"><span>${t}</span><strong>${v}</strong><small>${s}</small></div>`).join('');
+
+  const filtrando=$('#fBusca').value||$('#fStatus').value||$('#fTablet').value||$('#fDe').value||$('#fAte').value;
+  $('#tHist').innerHTML=tabela(['Professor','Equipamento','Retirada','Devolução','Duração','Bateria (saída → volta)'],lista.map(h=>{
+    const aberto=!h.devolucao;
+    return `<tr><td><b>${esc(h.nome)}</b><small>${esc(h.email)}</small></td>
+    <td><b>${esc(h.codigo)}</b><small>Tag ${esc(h.tag_tablet)}</small></td>
+    <td>${fmtCompleto(h.retirada)}</td>
+    <td>${aberto?chip('Em uso','var(--blue)'):fmtCompleto(h.devolucao)}</td>
+    <td>${duracao(minutosDe(h))}${aberto?'<small>em andamento</small>':''}</td>
+    <td>${bateriaHist(h)}</td></tr>`;
+  }),filtrando?'Nenhum empréstimo corresponde aos filtros.':'Ainda não há retiradas. Elas aparecem aqui assim que um tablet for retirado.');
+  $('#histRodape').textContent=S.hist.length?`Mostrando ${lista.length} de ${S.hist.length} registro${S.hist.length==1?'':'s'}.`:'';
+}
+function exportarHistorico(){
+  const lista=filtrarHistorico();
+  if(!lista.length){toast('Não há registros para exportar.',false);return}
+  const cel=v=>{let s=String(v??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+  const cab=['Professor','E-mail','Tablet','Tag do tablet','Retirada','Devolução','Duração','Bateria na retirada (%)','Bateria na devolução (%)','Situação'];
+  const linhas=lista.map(h=>[h.nome,h.email,h.codigo,h.tag_tablet,fmtCompleto(h.retirada),h.devolucao?fmtCompleto(h.devolucao):'',
+    duracao(minutosDe(h)),h.bateria_retirada??'',h.bateria_devolucao??'',h.devolucao?'Devolvido':'Em uso'].map(cel).join(';'));
+  const csv='\ufeff'+[cab.map(cel).join(';'),...linhas].join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='historico-tabcontrol-'+new Date().toLocaleDateString('sv-SE')+'.csv';
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Exportado: '+lista.length+' registro'+(lista.length==1?'':'s')+'.',true);
+}
+['#fBusca','#fStatus','#fTablet','#fDe','#fAte'].forEach(s=>$(s).addEventListener('input',renderHistorico));
+$('#fLimpar').onclick=()=>{['#fBusca','#fStatus','#fTablet','#fDe','#fAte'].forEach(s=>$(s).value='');renderHistorico()};
+$('#btnExportar').onclick=exportarHistorico;
+
+function abrir(codigo){
+  const t=S.tablets.find(x=>x.codigo==codigo);
+  if(!t)return;
+  const [l,c]=ST[t.status];
+  const leitura=leituraBateria(t);
+  const horaLeitura=t.bateria_atualizada_em
+    ?new Date(t.bateria_atualizada_em).toLocaleString('pt-BR')
+    :'Nenhuma leitura automática recebida';
+  const statusLeitura=leitura.fresca
+    ?`<span style="color:var(--green)">Atualizada há ${leitura.minutos} min</span>`
+    :`<span style="color:var(--red)">${leitura.minutos===null?'Sem leitura':`Desatualizada há ${leitura.minutos} min`}</span>`;
+  const leituraInfo=`<div class="aviso" style="margin:14px 0;padding:12px">
+    <b>Bateria registrada: ${t.bateria}%</b><br>
+    Última leitura automática: ${esc(horaLeitura)}<br>${statusLeitura}<br>
+    <small>Retirada exige leitura automática com no máximo ${BAT_MAX_AGE} minutos e bateria mínima de ${BAT_MIN}%.</small>
+  </div>`;
+  const hardwareForm=`<form data-act="hardware" data-close style="margin-top:14px">
+    <input type="hidden" name="codigo" value="${esc(t.codigo)}">
+    <label>Estado do hardware<select name="hardware">
+      <option value="ok"${t.hardware==='ok'?' selected':''}>Funcionando</option>
+      <option value="defeito"${t.hardware!=='ok'?' selected':''}>Com defeito</option>
+    </select></label>
+    <button class="btn sec">Salvar estado do hardware</button></form>`;
+  let corpo;
+  if(t.status==='emprestado'){
+    corpo=`<p style="margin:10px 0">Com <b>${esc(t.com)}</b>. A bateria continua sendo recebida automaticamente pelo app enquanto houver conexão.</p>
+      ${leituraInfo}
+      <form data-act="devolver" data-close><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
+      <label>Estado do hardware na devolução<select name="hardware"><option value="ok"${t.hardware==='ok'?' selected':''}>Funcionando</option><option value="defeito"${t.hardware!=='ok'?' selected':''}>Com defeito</option></select></label>
+      <button class="btn">Registrar devolução</button></form>`;
+  }else if(t.status==='manutencao'){
+    corpo=`<p class="aviso" style="margin:12px 0">Em manutenção, não pode ser retirado. Marque o hardware como funcionando para liberar.</p>${leituraInfo}${hardwareForm}`;
+  }else{
+    const bloqueioBateria=!leitura.fresca
+      ?(leitura.minutos===null?'Não há leitura automática registrada.':'A última leitura está vencida.')
+      :t.bateria<BAT_MIN?`Bateria em ${t.bateria}%, abaixo do mínimo de ${BAT_MIN}%.`:
+      '';
+    corpo=leituraInfo
+      +(bloqueioBateria?`<p class="aviso" style="margin:12px 0">${bloqueioBateria} A retirada ficará bloqueada até uma nova leitura automática válida.</p>`:'')
+      +(leitura.fresca&&t.bateria>=BAT_MIN
+        ?(S.profs.length?`<form data-act="retirar" data-close style="margin-top:14px"><input type="hidden" name="tag_tablet" value="${esc(t.tag_rfid)}">
+          <label>Quem está retirando<select name="tag_professor">${S.profs.map(p=>`<option value="${esc(p.tag_rfid)}">${esc(p.nome)}</option>`).join('')}</select></label>
+          <button class="btn">Retirar tablet</button></form>`:'<p class="vazio">Cadastre um professor antes de retirar.</p>')
+        :'')
+      +hardwareForm;
+  }
+  $('#dbody').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="font-size:24px">${esc(t.codigo)}</h1>${chip(l,c)}</div>
+    <small style="color:var(--mute)">Tag ${esc(t.tag_rfid)}</small>${corpo}
+    <div class="linha"><button class="btn sec sm" onclick="$('#dlg').close()">Fechar</button></div>`;
+  $('#dlg').showModal();
+}
+load();
+
+// Atualiza automaticamente a bateria no painel, sem obrigar o operador a recarregar a página.
+// A consulta é limitada à lista de tablets para não reiniciar formulários ou filtros em uso.
+async function atualizarBateriasPainel(){
+  if(document.visibilityState !== 'visible') return;
+  try{
+    const tabletsAtualizados = await api('tablets');
+    if(!Array.isArray(tabletsAtualizados)) return;
+    S.tablets = tabletsAtualizados;
+    renderResumo();
+    $('#totalTab').textContent = S.tablets.length;
+    $('#totalDisp').textContent = S.tablets.filter(t => t.status === 'disponivel').length;
+    $('#cabinet').innerHTML = S.tablets.length ? S.tablets.map(slot).join('')
+      : '<p class="vazio" style="grid-column:1/-1">Nenhum tablet cadastrado. Vá em Cadastros para adicionar o primeiro.</p>';
+    renderTabletsCad();
+  }catch(e){ console.warn('Não foi possível atualizar as baterias automaticamente.', e); }
+}
+setInterval(atualizarBateriasPainel, 30000);
+</script>
+</body>
+</html>
