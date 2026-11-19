@@ -122,6 +122,7 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
     <button data-v="painel" class="on">Armário</button>
     <button data-v="reservas">Reservas</button>
     <button data-v="historico">Histórico</button>
+    <button data-v="acessos">Acessos</button>
     <button data-v="obs">Observações</button>
     <button data-v="cadastros">Cadastros</button>
   </nav>
@@ -177,6 +178,19 @@ dialog::backdrop{background:rgba(11,47,85,.45)}
     </div>
     <div class="tbl" id="tHist"></div>
     <p class="hint hist-foot" id="histRodape"></p>
+  </div>
+</section>
+
+<section class="view" id="acessos">
+  <h1>Acessos ao armário</h1>
+  <p class="sub">Registro da fechadura: quem passou o crachá, o que foi retirado ou devolvido e os alertas.</p>
+  <div class="cad-stats hist-stats" id="acStats"></div>
+  <div class="card cad-list hist" style="margin-top:0">
+    <div class="hist-top">
+      <div><h2>Eventos da fechadura</h2><p>Os mais recentes aparecem primeiro. A lista se atualiza sozinha.</p></div>
+      <label class="search-label">Tipo de evento<select id="acTipo"><option value="">Todos</option><option value="abertura">Abertura</option><option value="retirada">Retirada</option><option value="devolucao">Devolução</option><option value="fechamento">Fechamento</option><option value="acesso_negado">Acesso negado</option><option value="alerta">Alerta</option><option value="timeout">Não abriu</option></select></label>
+    </div>
+    <div class="tbl" id="tAcessos"></div>
   </div>
 </section>
 
@@ -241,15 +255,16 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+' '+s.slice(11):'—';
 let BAT_MIN=50; // o valor real vem do servidor (/api/config)
+let IDADE_MAX=30; // minutos; acima disso a leitura de bateria e marcada como desatualizada
 const bat=b=>b<BAT_MIN?'var(--red)':b<BAT_MIN+20?'var(--amber)':'var(--green)';
 const ST={disponivel:['Livre','var(--green)'],emprestado:['Emprestado','var(--blue)'],manutencao:['Manutenção','var(--red)']};
-let S={tablets:[],profs:[],reservas:[],hist:[],obs:[]};
+let S={tablets:[],profs:[],reservas:[],hist:[],obs:[],acessos:[]};
 
 const api=async(u,b)=>(await fetch('/api/'+u,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:undefined)).json();
 
 async function load(){
-  BAT_MIN=(await api('config')).bateria_minima;
-  [S.tablets,S.profs,S.reservas,S.hist,S.obs]=await Promise.all(['tablets','professores','reservas','historico','observacoes'].map(u=>api(u)));
+  const cfg=await api('config');BAT_MIN=cfg.bateria_minima;IDADE_MAX=cfg.leitura_max_idade_min||30;
+  [S.tablets,S.profs,S.reservas,S.hist,S.obs,S.acessos]=await Promise.all(['tablets','professores','reservas','historico','observacoes','acessos'].map(u=>api(u)));
   render();
 }
 function toast(m,ok){const t=$('#toast');t.textContent=m;t.className='on'+(ok?'':' erro');clearTimeout(t.h);t.h=setTimeout(()=>t.className='',3800)}
@@ -279,12 +294,21 @@ document.addEventListener('submit',async e=>{
 });
 $$('nav button').forEach(b=>b.onclick=()=>{
   $$('nav button,.view').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');if(b.dataset.v==='historico')load();
+  b.classList.add('on');$('#'+b.dataset.v).classList.add('on');if(['historico','acessos'].includes(b.dataset.v))load();
 });
 
 const tabela=(cols,linhas,vazio)=>linhas.length
   ?`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${linhas.join('')}</tbody></table>`
   :`<p class="vazio">${vazio}</p>`;
+const idadeMin=s=>s?Math.max(0,Math.round((Date.now()-new Date(s.replace(' ','T')))/60000)):null;
+function atualizadoTxt(t){
+  const m=idadeMin(t.bateria_atualizada_em);
+  if(m==null)return 'sem leitura automática';
+  if(m<1)return 'atualizado agora';
+  if(m<60)return 'atualizado há '+m+' min';
+  const hh=Math.floor(m/60);return 'atualizado há '+(hh<24?hh+' h':Math.floor(hh/24)+' d');
+}
+const velha=t=>{const m=idadeMin(t.bateria_atualizada_em);return m!=null&&m>IDADE_MAX};
 const chip=(t,c)=>`<span class="chip" style="--c:${c}">${t}</span>`;
 
 function slot(t){
@@ -293,7 +317,8 @@ function slot(t){
   return `<button class="slot" style="--c:${c}" onclick="abrir('${esc(t.codigo)}')">
     <div class="top"><b>${esc(t.codigo)}</b>${chip(l,c)}</div>
     <div class="tab"><i style="height:${t.bateria}%;background:${bat(t.bateria)}"></i><span>${t.bateria}%</span></div>
-    <small>${nota}</small></button>`;
+    <small>${nota}</small>
+    <small style="font-size:11.5px;${velha(t)?'color:var(--amber);font-weight:600':''}">${atualizadoTxt(t)}${velha(t)?' ⚠':''}</small></button>`;
 }
 
 function renderProfessores(){
@@ -325,6 +350,7 @@ function render(){
     'Nenhuma reserva ainda. Use o formulário ao lado para criar a primeira.');
 
   renderHistorico();
+  renderAcessos();
 
   $('#lObs').innerHTML=S.obs.length?'<h2>Registros</h2>'+S.obs.map(o=>
     `<div class="obs"><b>${esc(o.codigo)}</b> ${tipoObs(o)} <small>${esc(o.nome)}, ${fmt(o.data)}</small><br>${esc(o.texto)}</div>`).join('')
@@ -360,6 +386,28 @@ async function excluir(tipo,id){
   toast(r.msg,r.ok);
   if(r.ok)await load();
 }
+
+/* ---------- Acessos (fechadura) ---------- */
+const AC={abertura:['Abertura','var(--blue)'],retirada:['Retirada','var(--amber)'],devolucao:['Devolução','var(--green)'],
+  fechamento:['Fechamento','var(--mute)'],acesso_negado:['Acesso negado','var(--red)'],alerta:['Alerta','var(--red)'],timeout:['Não abriu','var(--mute)']};
+function renderAcessos(){
+  const f=$('#acTipo').value,lista=S.acessos.filter(a=>!f||a.tipo===f);
+  const hoje=new Date().toLocaleDateString('sv-SE'),n=t=>S.acessos.filter(a=>a.tipo===t).length;
+  $('#acStats').innerHTML=[
+    ['Eventos hoje',S.acessos.filter(a=>a.recebido_em.slice(0,10)===hoje).length,'Desde a meia-noite'],
+    ['Aberturas',n('abertura'),'Crachá aceito'],
+    ['Acessos negados',n('acesso_negado'),'Crachá ou PIN inválido'],
+    ['Alertas',n('alerta'),'Porta forçada, baia violada etc.']
+  ].map(([t,v,s])=>`<div class="stat-card"><span>${t}</span><strong>${v}</strong><small>${s}</small></div>`).join('');
+  $('#tAcessos').innerHTML=tabela(['Quando','Evento','Quem','Baia','Detalhe'],lista.map(a=>{
+    const [l,c]=AC[a.tipo]||[a.tipo,'var(--mute)'];
+    const aviso=a.nome!=='—'&&!a.cadastrado&&a.tipo!=='alerta'?'<small>não vinculado a um professor cadastrado</small>':'';
+    return `<tr><td>${fmtCompleto(a.recebido_em)}</td><td>${chip(l,c)}</td>
+    <td><b>${esc(a.nome)}</b>${a.id_cracha?`<small>Crachá/PIN ${esc(a.id_cracha)}</small>`:''}${aviso}</td>
+    <td>${a.baia>0?'Baia '+a.baia:'—'}</td><td>${esc(a.detalhe)||'—'}</td></tr>`;
+  }),f?'Nenhum evento desse tipo.':'Ainda não há eventos. Eles aparecem aqui quando alguém usar a fechadura.');
+}
+$('#acTipo').addEventListener('input',renderAcessos);
 
 /* ---------- Histórico ---------- */
 const fmtCompleto=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4)+' '+s.slice(11,16):'—';
@@ -465,11 +513,13 @@ function abrir(codigo){
   }
   $('#dbody').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
     <h1 style="font-size:24px">${esc(t.codigo)}</h1>${chip(l,c)}</div>
-    <small style="color:var(--mute)">Tag ${esc(t.tag_rfid)}, bateria ${t.bateria}%</small>${corpo}
+    <small style="color:var(--mute)">Tag ${esc(t.tag_rfid)}, bateria ${t.bateria}% (${atualizadoTxt(t)})</small>${corpo}
     <div class="linha"><button class="btn sec sm" onclick="$('#dlg').close()">Fechar</button></div>`;
   $('#dlg').showModal();
 }
 load();
+// o painel se atualiza sozinho a cada 15 s (so enquanto a aba Armario esta aberta e nenhuma janela esta aberta)
+setInterval(()=>{if(!document.hidden&&($('#painel').classList.contains('on')||$('#acessos').classList.contains('on'))&&!$('#dlg').open)load()},15000);
 </script>
 </body>
 </html>

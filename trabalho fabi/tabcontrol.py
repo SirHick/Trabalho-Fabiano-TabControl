@@ -13,7 +13,7 @@ da funcao ler_tag() pela leitura real (serial, MQTT, HTTP, etc).
 import smtplib
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
 # ------------------------------------------------------------------
@@ -31,6 +31,8 @@ SMTP_PORTA = 587
 SMTP_USUARIO = ""
 SMTP_SENHA = ""
 EMAIL_ADMIN = "administracao@exemplo.com"
+
+LEITURA_MAX_IDADE_MIN = 30   # leitura de bateria mais velha que isso e considerada "desatualizada" (so aviso)
 
 FMT_BANCO = "%Y-%m-%d %H:%M"
 FMT_TELA = "%d/%m/%Y %H:%M"
@@ -92,6 +94,33 @@ def criar_tabelas():
             bateria_devolucao   INTEGER
         );
 
+        -- historico de leituras enviadas pelos tablets (API de bateria)
+        CREATE TABLE IF NOT EXISTS leituras_bateria (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            tablet_id      INTEGER NOT NULL REFERENCES tablets(id) ON DELETE CASCADE,
+            nivel          INTEGER NOT NULL,
+            temperatura    REAL,
+            tensao         REAL,
+            saude          TEXT,
+            horario_tablet TEXT,
+            recebido_em    TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_leituras_tablet ON leituras_bateria (tablet_id, id);
+
+        -- registro da fechadura (ESP32): quem passou o cracha, retiradas, devolucoes e alertas
+        CREATE TABLE IF NOT EXISTS acessos_armario (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo                TEXT NOT NULL,
+            usuario             TEXT,                 -- nome enviado pela fechadura
+            id_cracha           TEXT,                 -- UID do cracha / PIN usado
+            professor_id        INTEGER REFERENCES professores(id) ON DELETE SET NULL,
+            baia                INTEGER NOT NULL DEFAULT 0,
+            detalhe             TEXT,
+            horario_dispositivo TEXT,
+            recebido_em         TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_acessos_data ON acessos_armario (id);
+
         CREATE TABLE IF NOT EXISTS observacoes (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             tablet_id     INTEGER NOT NULL REFERENCES tablets(id),
@@ -108,6 +137,9 @@ def criar_tabelas():
             con.execute("ALTER TABLE observacoes ADD COLUMN tipo TEXT NOT NULL DEFAULT 'observacao'")
         if "resolvido" not in colunas:
             con.execute("ALTER TABLE observacoes ADD COLUMN resolvido INTEGER NOT NULL DEFAULT 0")
+        colunas_tab = [c["name"] for c in con.execute("PRAGMA table_info(tablets)")]
+        if "bateria_atualizada_em" not in colunas_tab:
+            con.execute("ALTER TABLE tablets ADD COLUMN bateria_atualizada_em TEXT")
 
 
 # ------------------------------------------------------------------
@@ -201,6 +233,115 @@ def atualizar_status_tablet(codigo, bateria, hardware):
 
 
 # ------------------------------------------------------------------
+# Leituras de bateria enviadas pelos tablets (API)
+# ------------------------------------------------------------------
+def registrar_leitura_bateria(codigo, nivel, temperatura=None, tensao=None,
+                              saude=None, horario_tablet=None):
+    """Chamada pela API quando um tablet envia a bateria.
+    Guarda no historico e atualiza tablets.bateria (o que o painel e o bloqueio de retirada usam).
+    NAO mexe em hardware/status: isso continua sendo decidido por defeito/devolucao."""
+    try:
+        nivel = int(nivel)
+    except (TypeError, ValueError):
+        return False, "Bateria invalida."
+    if not 0 <= nivel <= 100:
+        return False, "Bateria tem que estar entre 0 e 100."
+    recebido = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with conectar() as con:
+        tablet = con.execute("SELECT * FROM tablets WHERE codigo = ?", (codigo,)).fetchone()
+        if not tablet:
+            return False, f"Tablet '{codigo}' nao esta cadastrado."
+        con.execute(
+            """INSERT INTO leituras_bateria
+               (tablet_id, nivel, temperatura, tensao, saude, horario_tablet, recebido_em)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (tablet["id"], nivel, temperatura, tensao, saude, horario_tablet, recebido))
+        con.execute("UPDATE tablets SET bateria = ?, bateria_atualizada_em = ? WHERE id = ?",
+                    (nivel, recebido, tablet["id"]))
+        # mantem so as ultimas 1000 leituras de cada tablet (o banco nao cresce pra sempre)
+        con.execute("""DELETE FROM leituras_bateria WHERE tablet_id = ? AND id NOT IN
+                       (SELECT id FROM leituras_bateria WHERE tablet_id = ? ORDER BY id DESC LIMIT 1000)""",
+                    (tablet["id"], tablet["id"]))
+    return True, f"{codigo}: bateria {nivel}% registrada."
+
+
+def _como_api_antiga(l):
+    """Converte uma leitura para o formato que o main.py devolvia (usado pelo dashboard.py)."""
+    recebido = datetime.strptime(l["recebido_em"], "%Y-%m-%d %H:%M:%S").astimezone(timezone.utc)
+    return {
+        "id": l["id"],
+        "device_id": l["codigo"],
+        "level": l["nivel"],
+        "temperature": l["temperatura"],
+        "voltage": l["tensao"],
+        "health": l["saude"],
+        "device_time": l["horario_tablet"],
+        "received_at": recebido.isoformat(),   # UTC com fuso, igual ao main.py
+    }
+
+
+def dispositivos_api_antiga():
+    """Ultima leitura de cada tablet que ja enviou algo (equivale ao GET /devices do main.py)."""
+    with conectar() as con:
+        linhas = con.execute(
+            """SELECT l.*, t.codigo FROM leituras_bateria l JOIN tablets t ON t.id = l.tablet_id
+               WHERE l.id IN (SELECT MAX(id) FROM leituras_bateria GROUP BY tablet_id)
+               ORDER BY t.codigo""").fetchall()
+    return [_como_api_antiga(l) for l in linhas]
+
+
+def leituras_api_antiga(codigo, limite=1):
+    with conectar() as con:
+        linhas = con.execute(
+            """SELECT l.*, t.codigo FROM leituras_bateria l JOIN tablets t ON t.id = l.tablet_id
+               WHERE t.codigo = ? ORDER BY l.id DESC LIMIT ?""", (codigo, limite)).fetchall()
+    return [_como_api_antiga(l) for l in linhas]
+
+
+def historico_bateria(codigo, limite=100):
+    with conectar() as con:
+        linhas = con.execute(
+            """SELECT l.* FROM leituras_bateria l JOIN tablets t ON t.id = l.tablet_id
+               WHERE t.codigo = ? ORDER BY l.id DESC LIMIT ?""", (codigo, limite)).fetchall()
+    return [dict(l) for l in linhas]
+
+
+# ------------------------------------------------------------------
+# Acessos ao armario (fechadura ESP32)
+# ------------------------------------------------------------------
+TIPOS_ACESSO = {"abertura", "acesso_negado", "retirada", "devolucao",
+                "fechamento", "timeout", "alerta"}
+
+
+def registrar_acesso(tipo, usuario="", id_cracha="", baia=0, detalhe="", horario_dispositivo=None):
+    """Grava um evento enviado pela fechadura. Se o cracha (id_cracha) for a tag RFID de um
+    professor cadastrado, o evento fica vinculado a ele."""
+    tipo = str(tipo or "").strip().lower()
+    if tipo not in TIPOS_ACESSO:
+        return False, f"Tipo de evento desconhecido: '{tipo}'."
+    try:
+        baia = int(baia or 0)
+    except (TypeError, ValueError):
+        baia = 0
+    cortar = lambda v: str(v or "").strip()[:200]
+    usuario, id_cracha, detalhe = cortar(usuario), cortar(id_cracha), cortar(detalhe)
+    horario = cortar(horario_dispositivo) or None
+    recebido = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with conectar() as con:
+        prof = None
+        if id_cracha:
+            prof = con.execute("SELECT id FROM professores WHERE tag_rfid = ?", (id_cracha,)).fetchone()
+        con.execute(
+            """INSERT INTO acessos_armario
+               (tipo, usuario, id_cracha, professor_id, baia, detalhe, horario_dispositivo, recebido_em)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tipo, usuario, id_cracha, prof["id"] if prof else None, baia, detalhe, horario, recebido))
+        con.execute("""DELETE FROM acessos_armario WHERE id NOT IN
+                       (SELECT id FROM acessos_armario ORDER BY id DESC LIMIT 5000)""")
+    return True, "Acesso registrado."
+
+
+# ------------------------------------------------------------------
 # Exclusao de cadastros
 # ------------------------------------------------------------------
 def _plural(n, singular, plural):
@@ -256,6 +397,7 @@ def excluir_tablet(tablet_id, forcar=False):
         con.execute("DELETE FROM emprestimos WHERE tablet_id = ?", (tablet_id,))
         con.execute("DELETE FROM reservas WHERE tablet_id = ?", (tablet_id,))
         con.execute("DELETE FROM observacoes WHERE tablet_id = ?", (tablet_id,))
+        con.execute("DELETE FROM leituras_bateria WHERE tablet_id = ?", (tablet_id,))
         con.execute("DELETE FROM tablets WHERE id = ?", (tablet_id,))
     return True, f"Tablet {tablet['codigo']} excluido."
 
